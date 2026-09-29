@@ -10,5 +10,8 @@
 - [x] Add `.env.example` with placeholders for `SECRET_KEY`, `DEBUG`, `LLM_PROXY_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `GOOGLE_API_KEY`.
 - [x] Add `README.md` with Python 3.12.3 and exact fresh-clone setup and run steps.
 - [x] Run migrations and verify the default Django welcome page at `http://localhost:8000` with a background server that is stopped afterward.
-- [ ] Review the diff, commit in Conventional Commit chunks, verify a fresh clone according to `AGENTS.md` where applicable, merge to `main`, and try pushing to `origin main`.
+- [x] Review the diff and commit in Conventional Commit chunks.
+- [x] Verify a fresh clone using only the README setup steps: dependency install, migrations, and a background server returning the default welcome page; stop the server and remove the clone afterward.
+- [ ] Satisfy the `AGENTS.md` pre-merge requirement to confirm the demo login works. No demo login exists because login functionality is outside this scaffold's scope.
+- [ ] Merge to `main` and try pushing to `origin main` after the pre-merge requirement is resolved.
 - [x] Update `doc/wiki/` to reflect the scaffolded project.

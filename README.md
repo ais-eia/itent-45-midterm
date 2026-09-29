@@ -34,3 +34,7 @@ After running migrations, a local demo account is available with username `demo`
 ## Credit Wallet
 
 Signed-in users see their credit balance in the site header. New accounts and the demo account receive 100 credits from migrations/signup provisioning. Visit <http://localhost:8000/wallet/top-up/> to add a positive whole-number amount through a simulated top-up; no payment is taken and no currency conversion or credit price is defined. The page lists timestamped wallet transactions, including signup bonuses, top-ups, and future usage deductions.
+
+## Model Catalog
+
+Browse active provisional models at <http://localhost:8000/models/>. The picker groups them by provider, shows tier and input/output credit prices, and allows a temporary in-page selection; it does not make a model call or persist a preference. Staff can change availability in Django admin by editing the catalog's **Active** column. See `doc/wiki/model-catalog.md` for the provisional catalog and price ladder; its IDs and invented credit prices are not official.

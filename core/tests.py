@@ -4,6 +4,11 @@ from django.urls import reverse
 
 
 class AccountViewTests(TestCase):
+    def test_root_redirects_to_account_login(self):
+        response = self.client.get('/')
+
+        self.assertRedirects(response, reverse('account_login'))
+
     def test_signup_creates_user_and_redirects_to_login(self):
         response = self.client.post(
             reverse('account_signup'),

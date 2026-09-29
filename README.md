@@ -17,7 +17,7 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-The development server is available at <http://localhost:8000/>.
+The development server is available at <http://localhost:8000/>; the site root redirects to the login page.
 
 `.env.example` contains placeholders for local development. Replace them in your local `.env` as needed; never commit `.env` or real provider credentials.
 

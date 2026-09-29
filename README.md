@@ -37,7 +37,9 @@ After running migrations, a local demo account is available with username `demo`
 
 ## Credit Wallet
 
-Signed-in users see their credit balance in the site header. New accounts and the demo account receive 100 credits from migrations/signup provisioning. Visit <http://localhost:8000/wallet/top-up/> to add a positive whole-number amount through a simulated top-up; no payment is taken and no currency conversion or credit price is defined. The page lists timestamped wallet transactions, including signup bonuses, top-ups, and future usage deductions.
+Signed-in users see their credit balance in the site header. New accounts and the demo account receive 100 credits from migrations/signup provisioning. Visit <http://localhost:8000/wallet/top-up/> to add a positive whole-number amount through a simulated top-up; no payment is taken and no currency conversion or credit price is defined. The page lists the timestamped wallet ledger, including signup bonuses, top-ups, and usage deductions.
+
+The detailed usage history at <http://localhost:8000/wallet/usage/> lists charge time, chat, model/tier, token counts, credits, and mock/real mode. It shows both lifetime credits spent and the subtotal for active model/date filters, newest-first at 20 rows per page. Both totals come from usage ledger entries and include deleted chats, which are marked **(deleted chat)**.
 
 ## Model Catalog
 

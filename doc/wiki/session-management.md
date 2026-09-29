@@ -6,5 +6,6 @@
 - The sidebar is owner-filtered, ordered by latest activity, and paginated 20 conversations at a time. Reopening a conversation loads its full message history; continuing it updates its activity time.
 - Chat detail, message submission, rename, delete confirmation, and delete actions all verify conversation ownership. A different user's conversation returns 404. Rename is a CSRF-protected POST and does not change activity ordering.
 - Delete requires a confirmation page and POST; it sets `deleted_at` rather than deleting the conversation or exchanges. Usage wallet transactions remain linked and auditable. The wallet transaction history labels a charge from a deleted conversation as `(deleted chat)`.
+- The `/wallet/usage/` history keeps charges from deleted conversations and uses the same `(deleted chat)` marker while reconciling totals to the wallet ledger.
 - Links and form actions use Django named URL reversals so `FORCE_SCRIPT_NAME` keeps them under a hosted path prefix.
 - Streaming, uploads, web search, conversation sharing, and hard deletion are not implemented.

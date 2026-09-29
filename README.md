@@ -21,7 +21,7 @@ The development server is available at <http://localhost:8000/>; the site root r
 
 `.env.example` contains placeholders for local development. Replace them in your local `.env` as needed; never commit `.env` or real provider credentials.
 
-For hosted development environments, add the assigned hostname (without a scheme or path) to `ALLOWED_HOSTS` and its full origin (scheme plus hostname, without a path prefix) to `CSRF_TRUSTED_ORIGINS` in `.env`. If the host mounts the app under a path prefix and does not pass WSGI `SCRIPT_NAME`, set `FORCE_SCRIPT_NAME` to that prefix so Django reversals, redirects, and static URLs stay under the mount. See the commented placeholders in `.env.example`; do not commit a specific hosted hostname.
+For hosted development environments, add the assigned hostname (without a scheme or path) to `ALLOWED_HOSTS` and its full origin (scheme plus hostname, without a path prefix) to `CSRF_TRUSTED_ORIGINS` in `.env`. If the host mounts the app under a path prefix and does not pass WSGI `SCRIPT_NAME`, set `FORCE_SCRIPT_NAME` to that prefix so Django reversals and static URLs stay under the mount. If the host also prepends that same prefix to response `Location` headers, enable `STRIP_PREFIX_FROM_REDIRECTS`; leave it off otherwise. See the commented placeholders in `.env.example`; do not commit a specific hosted hostname.
 
 ## Hosted Preview Navigation
 

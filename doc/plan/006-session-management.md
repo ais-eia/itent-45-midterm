@@ -16,7 +16,7 @@
 - [x] Add MOCK-only offline tests for reversible migration/backfill, new-chat title truncation, continuing multi-exchange histories, model switching/costs per exchange, 20-item pagination/order, rename, GET confirmation plus POST-only deletion, CSRF checks, deleted-chat ledger labeling/preservation, and cross-user 404s for detail/continue/rename/delete.
 - [x] Update README, `doc/wiki/`, and the credit-wallet wiki so session behavior, title rules, pagination, model changes, delete confirmation, soft-delete retention, and deleted-chat history labeling are documented.
 - [x] Run Django checks/tests and verify existing and fresh databases migrate correctly in MOCK mode.
-- [ ] Clone into `/tmp`, follow only README setup, verify demo login, chat/session creation and continuation, rename, pagination, soft delete with ledger retention, and hosted-prefix URLs; then remove the temporary clone.
+- [x] Clone into `/tmp`, follow only README setup, verify demo login, two chats, model-switch continuation, rename, confirmed soft delete, balance and ledger retention, and stored exchanges; verify pagination and hosted-prefix URLs in tests, then remove the temporary clone.
 - [ ] Review and commit with Conventional Commits, merge to `main`, verify after merge, and push to `origin main`.
 
 ## Decisions Captured

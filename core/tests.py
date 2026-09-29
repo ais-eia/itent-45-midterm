@@ -1036,7 +1036,7 @@ class ConversationBackfillMigrationTests(TransactionTestCase):
     LLM_PROXY_REQUEST_STYLE='',
     LLM_MAX_OUTPUT_TOKENS=64,
 )
-class ConversationSessionTests(ProjectTestCase):
+class LegacyConversationSessionTests(ProjectTestCase):
     def setUp(self):
         super().setUp()
         self.user = get_user_model().objects.get(username='demo')
@@ -1061,7 +1061,7 @@ class ConversationSessionTests(ProjectTestCase):
         self.assertEqual(match.url_name, 'conversation_chat')
         return Conversation.objects.get(pk=match.kwargs['conversation_id'])
 
-    def test_new_chat_get_is_empty_and_first_success_creates_truncated_title(self):
+    def test_legacy_new_chat_get_is_empty_and_first_success_creates_truncated_title(self):
         response = self.client.get(reverse('chat'))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Conversation.objects.filter(user=self.user).count(), 0)
@@ -1078,7 +1078,7 @@ class ConversationSessionTests(ProjectTestCase):
         self.assertEqual(exchange.user_id, conversation.user_id)
         self.assertEqual(exchange.model, self.value_model)
 
-    def test_conversation_can_continue_with_a_different_model(self):
+    def test_legacy_conversation_can_continue_with_a_different_model(self):
         conversation = self.start_chat('First message.', self.value_model)
         first_exchange = conversation.exchanges.get()
         second_prompt = 'token ' * 120
@@ -1109,7 +1109,7 @@ class ConversationSessionTests(ProjectTestCase):
         self.assertContains(history, self.value_model.display_name)
         self.assertContains(history, self.premium_model.display_name)
 
-    def test_rename_is_post_only_keeps_activity_and_survives_more_messages(self):
+    def test_legacy_rename_is_post_only_keeps_activity_and_survives_more_messages(self):
         conversation = self.start_chat('Original title prompt.')
         last_activity = conversation.last_activity_at
         rename_url = reverse('conversation_rename', args=(conversation.pk,))
@@ -1140,7 +1140,7 @@ class ConversationSessionTests(ProjectTestCase):
         self.assertEqual(conversation.title, 'Renamed chat')
         self.assertEqual(conversation.exchanges.count(), 2)
 
-    def test_sidebar_is_newest_first_and_paginated_by_twenty(self):
+    def test_legacy_sidebar_is_newest_first_and_paginated_by_twenty(self):
         now = timezone.now()
         conversations = [
             Conversation.objects.create(
@@ -1165,7 +1165,7 @@ class ConversationSessionTests(ProjectTestCase):
         self.assertContains(second_page, 'Saved chat 20')
         self.assertContains(second_page, f'href="{reverse("chat")}?page=1"')
 
-    def test_delete_confirmation_soft_deletes_but_preserves_exchange_and_ledger(self):
+    def test_legacy_delete_confirmation_soft_deletes_but_preserves_exchange_and_ledger(self):
         conversation = self.start_chat('A chat to archive.')
         exchange = conversation.exchanges.get()
         usage_entry = exchange.usage_transaction
@@ -1209,7 +1209,7 @@ class ConversationSessionTests(ProjectTestCase):
         self.assertEqual(csrf_client.get(reverse('conversation_chat', args=(conversation.pk,))).status_code, 404)
         self.assertContains(csrf_client.get(reverse('wallet_top_up')), '(deleted chat)')
 
-    def test_other_users_receive_404_for_chat_rename_and_delete(self):
+    def test_legacy_other_users_receive_404_for_chat_rename_and_delete(self):
         conversation = self.start_chat('Private conversation title.')
         other_user = get_user_model().objects.create_user(
             username='other-session-owner',
@@ -1235,7 +1235,7 @@ class ConversationSessionTests(ProjectTestCase):
         self.assertFalse(ChatExchange.objects.filter(user=other_user).exists())
         self.assertIsNone(Conversation.objects.get(pk=conversation.pk).deleted_at)
 
-    def test_session_links_and_forms_use_script_prefixed_urls(self):
+    def test_legacy_session_links_and_forms_use_script_prefixed_urls(self):
         now = timezone.now()
         conversations = [
             Conversation.objects.create(
@@ -1298,14 +1298,6 @@ class ConversationSessionTests(ProjectTestCase):
     LLM_PROXY_REQUEST_STYLE='',
     LLM_MAX_OUTPUT_TOKENS=64,
 )
-@override_settings(
-    LLM_PROXY_BASE_URL='',
-    OPENAI_PROXY_BASE_URL='',
-    ANTHROPIC_PROXY_BASE_URL='',
-    GOOGLE_PROXY_BASE_URL='',
-    LLM_PROXY_REQUEST_STYLE='',
-    LLM_MAX_OUTPUT_TOKENS=64,
-)
 class ConversationSessionTests(ProjectTestCase):
     def setUp(self):
         super().setUp()
@@ -1314,12 +1306,6 @@ class ConversationSessionTests(ProjectTestCase):
         self.value_model = CatalogModel.objects.get(display_name='GPT-5.6 Luna')
         self.premium_model = CatalogModel.objects.get(display_name='GPT-5.6 Sol')
         self.client.force_login(self.user)
-        self.network_guard = patch(
-            'requests.sessions.Session.send',
-            side_effect=AssertionError('Unexpected network request in offline test.'),
-        )
-        self.network_guard.start()
-        self.addCleanup(self.network_guard.stop)
         self.network_guard = patch(
             'requests.sessions.Session.send',
             side_effect=AssertionError('Unexpected network request in offline test.'),

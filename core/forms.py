@@ -35,7 +35,3 @@ class ChatForm(forms.Form):
 
 class ConversationTitleForm(forms.Form):
     title = forms.CharField(max_length=80, strip=True, label='Conversation title')
-
-
-class ConversationTitleForm(forms.Form):
-    title = forms.CharField(max_length=80, strip=True, label='Conversation title')

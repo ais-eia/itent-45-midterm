@@ -21,6 +21,8 @@ The development server is available at <http://localhost:8000/>; the site root r
 
 `.env.example` contains placeholders for local development. Replace them in your local `.env` as needed; never commit `.env` or real provider credentials.
 
+For hosted development environments, add the assigned hostname to the comma-separated `ALLOWED_HOSTS` setting and its full origin (including `http://` or `https://`) to `CSRF_TRUSTED_ORIGINS` in `.env`. See the commented placeholders in `.env.example`; do not commit a specific hosted hostname.
+
 ## Accounts
 
 - Sign up at <http://localhost:8000/accounts/signup/>.

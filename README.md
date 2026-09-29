@@ -23,6 +23,10 @@ The development server is available at <http://localhost:8000/>; the site root r
 
 For hosted development environments, add the assigned hostname to the comma-separated `ALLOWED_HOSTS` setting and its full origin (including `http://` or `https://`) to `CSRF_TRUSTED_ORIGINS` in `.env`. See the commented placeholders in `.env.example`; do not commit a specific hosted hostname.
 
+## Hosted Preview Navigation
+
+The signed-in header links and logout action use named Django routes. If a hosted preview shows a navigation or method error and no matching request appears in the `runserver` terminal, the request is being handled or misrouted before it reaches Django. Check that the preview preserves the app's origin/path prefix and forwards both GET and POST requests; for a path-mounted WSGI deployment, the host must provide the correct `SCRIPT_NAME`. A direct curl POST without a browser session's CSRF cookie/token is expected to receive HTTP 403.
+
 ## Accounts
 
 - Sign up at <http://localhost:8000/accounts/signup/>.

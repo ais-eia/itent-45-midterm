@@ -32,7 +32,14 @@ class CapturingHandler(logging.Handler):
         self.messages.append(record.getMessage())
 
 
-class AccountViewTests(TestCase):
+class ProjectTestCase(TestCase):
+    def setUp(self):
+        previous_prefix = get_script_prefix()
+        set_script_prefix('/')
+        self.addCleanup(set_script_prefix, previous_prefix)
+
+
+class AccountViewTests(ProjectTestCase):
     def test_root_redirects_to_account_login(self):
         response = self.client.get('/')
 
@@ -167,8 +174,17 @@ class AccountViewTests(TestCase):
         self.assertNotIn('_auth_user_id', client.session)
 
 
-class HeaderNavigationTests(TestCase):
+@override_settings(
+    FORCE_SCRIPT_NAME=None,
+    STATIC_URL='static/',
+    STRIP_PREFIX_FROM_REDIRECTS=False,
+)
+class HeaderNavigationTests(ProjectTestCase):
     def setUp(self):
+        super().setUp()
+        previous_prefix = get_script_prefix()
+        set_script_prefix('/')
+        self.addCleanup(set_script_prefix, previous_prefix)
         self.user = get_user_model().objects.get(username='demo')
         self.client.force_login(self.user)
 
@@ -226,6 +242,7 @@ class HeaderNavigationTests(TestCase):
             with override_settings(
                 FORCE_SCRIPT_NAME=prefix,
                 STATIC_URL=f'{prefix}/static/',
+                STRIP_PREFIX_FROM_REDIRECTS=False,
                 LOGIN_URL='account_login',
                 LOGIN_REDIRECT_URL='site_root',
             ):
@@ -262,6 +279,48 @@ class HeaderNavigationTests(TestCase):
                 )
                 self.assertEqual(logout.status_code, 302)
                 self.assertEqual(logout['Location'], reverse('account_login'))
+        finally:
+            set_script_prefix(previous_prefix)
+
+    def test_redirect_prefix_is_stripped_only_when_enabled(self):
+        prefix = '/mounted'
+        previous_prefix = get_script_prefix()
+        set_script_prefix(prefix)
+        try:
+            with override_settings(
+                FORCE_SCRIPT_NAME=prefix,
+                STATIC_URL=f'{prefix}/static/',
+                STRIP_PREFIX_FROM_REDIRECTS=True,
+                LOGIN_URL='account_login',
+                LOGIN_REDIRECT_URL='site_root',
+            ):
+                header = self.client.get('/accounts/login/')
+                self.assertContains(header, f'href="{reverse("chat")}"')
+                self.assertContains(header, f'action="{reverse("account_logout")}"')
+                self.assertContains(header, f'href="{prefix}/static/core/accounts.css"')
+
+                root = self.client.get('/')
+                self.assertEqual(root['Location'], '/accounts/login/')
+
+                guest = Client()
+                protected = guest.get('/chat/')
+                self.assertTrue(protected['Location'].startswith('/accounts/login/'))
+                login = guest.post(
+                    '/accounts/login/',
+                    {'username': 'demo', 'password': 'demo12345'},
+                )
+                self.assertEqual(login['Location'], '/')
+
+                logout_client = Client(enforce_csrf_checks=True)
+                logout_client.force_login(self.user)
+                logout_client.get('/accounts/login/')
+                csrf_token = logout_client.cookies['csrftoken'].value
+                logout = logout_client.post(
+                    '/accounts/logout/',
+                    HTTP_X_CSRFTOKEN=csrf_token,
+                )
+                self.assertEqual(logout.status_code, 302)
+                self.assertEqual(logout['Location'], '/accounts/login/')
         finally:
             set_script_prefix(previous_prefix)
 
@@ -314,8 +373,9 @@ class HeaderNavigationTests(TestCase):
             set_script_prefix(previous_prefix)
 
 
-class WalletTests(TestCase):
+class WalletTests(ProjectTestCase):
     def setUp(self):
+        super().setUp()
         self.user = get_user_model().objects.get(username='demo')
         self.wallet = self.user.wallet
         self.client.force_login(self.user)
@@ -465,7 +525,7 @@ class WalletTests(TestCase):
             )
 
 
-class CatalogPickerTests(TestCase):
+class CatalogPickerTests(ProjectTestCase):
     def test_provisional_catalog_seed_has_all_nine_expected_models(self):
         expected = {
             ('openai', 'gpt-5.6-luna'): ('GPT-5.6 Luna', 'value', 1, 2),
@@ -622,8 +682,9 @@ class CatalogPickerTests(TestCase):
     LLM_PROXY_REQUEST_STYLE='',
     LLM_MAX_OUTPUT_TOKENS=64,
 )
-class MeteredChatTests(TestCase):
+class MeteredChatTests(ProjectTestCase):
     def setUp(self):
+        super().setUp()
         self.user = get_user_model().objects.get(username='demo')
         self.wallet = self.user.wallet
         self.model = CatalogModel.objects.get(display_name='GPT-5.6 Luna')

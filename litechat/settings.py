@@ -51,6 +51,10 @@ LLM_MAX_OUTPUT_TOKENS = int(os.getenv('LLM_MAX_OUTPUT_TOKENS', '512'))
 _script_prefix = os.getenv('FORCE_SCRIPT_NAME', '').strip().strip('/')
 FORCE_SCRIPT_NAME = f'/{_script_prefix}' if _script_prefix else None
 STATIC_URL = f'{FORCE_SCRIPT_NAME}/static/' if FORCE_SCRIPT_NAME else 'static/'
+STRIP_PREFIX_FROM_REDIRECTS = (
+    os.getenv('STRIP_PREFIX_FROM_REDIRECTS', '').strip().lower()
+    in {'1', 'true', 'yes', 'on'}
+)
 
 
 # Application definition
@@ -66,6 +70,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'core.middleware.StripPrefixFromRedirectsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

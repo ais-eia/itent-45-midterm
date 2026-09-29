@@ -13,8 +13,9 @@
 - [x] Add tests for migration/signup/demo starting balances, ledger-to-balance consistency, successful and invalid top-ups, anonymous access, signed usage deductions, insufficient-balance rejection, atomic rollback, and balance/history header rendering.
 - [x] Update `README.md` and `doc/wiki/` with the wallet header, fake top-up flow, ledger semantics, and 100-credit starting bonus.
 - [x] Run Django checks/tests and verify a fresh database migration initializes the demo wallet and ledger correctly.
-- [ ] Clone into `/tmp`, follow only the README setup, confirm migrations and server startup, test demo login and wallet balance/top-up, then remove the temporary clone.
-- [ ] Review and commit with Conventional Commits, merge to `main`, confirm the app works after merge, and push to `origin main`.
+- [x] Clone into `/tmp`, follow only the README setup, confirm migrations and server startup, test demo login and wallet balance/top-up, then remove the temporary clone.
+- [x] Review and commit with Conventional Commits.
+- [ ] Merge to `main`, confirm the app works after merge, and push to `origin main`.
 
 ## Scope Decision For Review
 

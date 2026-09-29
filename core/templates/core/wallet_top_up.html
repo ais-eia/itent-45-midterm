@@ -8,7 +8,8 @@
     <h1>Top up credits</h1>
     <p class="intro">Current balance: <strong>{{ wallet.balance }} credits</strong></p>
     <p class="fake-payment-note">This is a simulated payment. No money will be charged.</p>
-    <form method="post">
+    <p><a href="{% url 'usage_history' %}">View detailed usage history</a></p>
+    <form method="post" action="{% url 'wallet_top_up' %}">
       {% csrf_token %}
       {{ form.as_p }}
       <button class="primary-button" type="submit">Confirm fake top-up</button>

@@ -6,6 +6,8 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Sum
+from django.db.models.functions import Abs
 from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -13,7 +15,7 @@ from django.utils import timezone
 from django.views.generic import CreateView, FormView, TemplateView
 
 from .chat_service import InsufficientPreflightCredits, create_exchange
-from .forms import ChatForm, ConversationTitleForm, TopUpForm
+from .forms import ChatForm, ConversationTitleForm, TopUpForm, UsageHistoryFilterForm
 from .models import CatalogModel, ChatExchange, Conversation, WalletTransaction
 from .providers import ProviderError
 from .wallets import InsufficientCredits, apply_wallet_transaction
@@ -50,6 +52,74 @@ class WalletTopUpView(LoginRequiredMixin, FormView):
         context['wallet'] = wallet
         context['transactions'] = wallet.transactions.select_related(
             'exchange__conversation',
+        )
+        return context
+
+
+class UsageHistoryView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/usage_history.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        wallet = user.wallet
+        usage = WalletTransaction.objects.filter(
+            wallet=wallet,
+            transaction_type=WalletTransaction.Type.USAGE,
+            exchange__user=user,
+            exchange__conversation__user=user,
+        )
+        filter_form = UsageHistoryFilterForm(
+            self.request.GET if self.request.GET else None,
+            user=user,
+        )
+        filters_valid = not filter_form.is_bound or filter_form.is_valid()
+        filtered_usage = usage
+        if filters_valid and filter_form.is_bound:
+            model = filter_form.cleaned_data['model']
+            start_date = filter_form.cleaned_data['start_date']
+            end_date = filter_form.cleaned_data['end_date']
+            if model:
+                filtered_usage = filtered_usage.filter(exchange__model=model)
+            if start_date:
+                filtered_usage = filtered_usage.filter(created_at__date__gte=start_date)
+            if end_date:
+                filtered_usage = filtered_usage.filter(created_at__date__lte=end_date)
+
+        lifetime_total = -(usage.aggregate(total=Sum('amount'))['total'] or 0)
+        filtered_total = -(filtered_usage.aggregate(total=Sum('amount'))['total'] or 0)
+        entries = filtered_usage.order_by('-created_at', '-pk').select_related(
+            'exchange__conversation',
+            'exchange__model',
+        ).annotate(credits_charged=Abs('amount'))
+        context.update(
+            {
+                'filter_form': filter_form,
+                'filter_error': filter_form.is_bound and not filters_valid,
+                'filters_applied': bool(
+                    filters_valid
+                    and filter_form.is_bound
+                    and any(filter_form.cleaned_data.values())
+                ),
+                'model_filter_value': (
+                    filter_form.cleaned_data['model'].pk
+                    if filters_valid and filter_form.is_bound and filter_form.cleaned_data['model']
+                    else ''
+                ),
+                'start_date_filter_value': (
+                    filter_form.cleaned_data['start_date'].isoformat()
+                    if filters_valid and filter_form.is_bound and filter_form.cleaned_data['start_date']
+                    else ''
+                ),
+                'end_date_filter_value': (
+                    filter_form.cleaned_data['end_date'].isoformat()
+                    if filters_valid and filter_form.is_bound and filter_form.cleaned_data['end_date']
+                    else ''
+                ),
+                'lifetime_total': lifetime_total,
+                'filtered_total': filtered_total,
+                'page_obj': Paginator(entries, 20).get_page(self.request.GET.get('page')),
+            }
         )
         return context
 

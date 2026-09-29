@@ -1,0 +1,88 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Usage history | LiteChat{% endblock %}
+{% block page_class %}usage-shell{% endblock %}
+
+{% block content %}
+  <section class="usage-history" aria-labelledby="usage-heading">
+    <p class="eyebrow">Credit ledger</p>
+    <h1 id="usage-heading">Usage history</h1>
+    <div class="usage-totals" aria-label="Credits spent">
+      <article class="usage-total">
+        <span>Lifetime credits spent</span>
+        <strong>{{ lifetime_total }} credits</strong>
+      </article>
+      <article class="usage-total">
+        <span>Credits matching filters, all pages</span>
+        <strong>{{ filtered_total }} credits</strong>
+      </article>
+    </div>
+
+    <form class="usage-filters" method="get" action="{% url 'usage_history' %}">
+      <h2>Filter usage</h2>
+      {% if filter_error %}
+        <p class="filter-error" role="alert">The filters were not applied. Showing your complete usage history.</p>
+      {% endif %}
+      {{ filter_form.non_field_errors }}
+      {{ filter_form.as_p }}
+      <div class="filter-actions">
+        <button class="primary-button" type="submit">Apply filters</button>
+        <a href="{% url 'usage_history' %}">Clear filters</a>
+      </div>
+    </form>
+
+    <section class="transaction-history" aria-labelledby="usage-rows-heading">
+      <h2 id="usage-rows-heading">Charges ({{ page_obj.paginator.count }})</h2>
+      {% if page_obj.object_list %}
+        <div class="transaction-scroll">
+          <table class="transaction-table usage-table">
+            <thead>
+              <tr>
+                <th scope="col">Charged</th>
+                <th scope="col">Chat</th>
+                <th scope="col">Model</th>
+                <th scope="col">Tier</th>
+                <th scope="col">Input tokens</th>
+                <th scope="col">Output tokens</th>
+                <th scope="col">Credits</th>
+                <th scope="col">Mode</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in page_obj.object_list %}
+                <tr>
+                  <td><time datetime="{{ entry.created_at|date:'c' }}">{{ entry.created_at|date:"Y-m-d H:i" }}</time></td>
+                  <td>
+                    {{ entry.exchange.conversation.title }}
+                    {% if entry.exchange.conversation.deleted_at %}<span class="muted">(deleted chat)</span>{% endif %}
+                  </td>
+                  <td>{{ entry.exchange.model.display_name }}</td>
+                  <td>{{ entry.exchange.model.get_tier_display }}</td>
+                  <td>{{ entry.exchange.input_tokens }}</td>
+                  <td>{{ entry.exchange.output_tokens }}</td>
+                  <td>{{ entry.credits_charged }}</td>
+                  <td>{{ entry.exchange.get_mode_display }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="empty-catalog">No usage charges match these filters.</p>
+      {% endif %}
+
+      {% if page_obj.paginator.num_pages > 1 %}
+        {% url 'usage_history' as usage_url %}
+        <nav class="usage-pagination" aria-label="Usage history pages">
+          {% if page_obj.has_previous %}
+            <a href="{{ usage_url }}?page={{ page_obj.previous_page_number }}{% if model_filter_value %}&amp;model={{ model_filter_value|urlencode }}{% endif %}{% if start_date_filter_value %}&amp;start_date={{ start_date_filter_value|urlencode }}{% endif %}{% if end_date_filter_value %}&amp;end_date={{ end_date_filter_value|urlencode }}{% endif %}">Newer</a>
+          {% endif %}
+          <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+            <a href="{{ usage_url }}?page={{ page_obj.next_page_number }}{% if model_filter_value %}&amp;model={{ model_filter_value|urlencode }}{% endif %}{% if start_date_filter_value %}&amp;start_date={{ start_date_filter_value|urlencode }}{% endif %}{% if end_date_filter_value %}&amp;end_date={{ end_date_filter_value|urlencode }}{% endif %}">Older</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    </section>
+  </section>
+{% endblock %}

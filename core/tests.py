@@ -3,7 +3,7 @@ import os
 import secrets
 import subprocess
 import sys
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -13,6 +13,7 @@ from django.db import IntegrityError, connection, transaction
 from django.db.models import Sum
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import get_script_prefix, resolve, reverse, set_script_prefix
 from django.utils import timezone
 
@@ -1554,5 +1555,297 @@ class ConversationSessionTests(ProjectTestCase):
                     f'href="{reverse("conversation_chat", args=(conversation.pk,))}?page=2"',
                 )
                 self.assertContains(response, f'href="{prefix}/static/core/accounts.css"')
+        finally:
+            set_script_prefix(previous_prefix)
+
+
+@override_settings(
+    FORCE_SCRIPT_NAME=None,
+    STATIC_URL='static/',
+    STRIP_PREFIX_FROM_REDIRECTS=False,
+    LLM_PROXY_BASE_URL='',
+    OPENAI_PROXY_BASE_URL='',
+    ANTHROPIC_PROXY_BASE_URL='',
+    GOOGLE_PROXY_BASE_URL='',
+    LLM_PROXY_REQUEST_STYLE='',
+    LLM_MAX_OUTPUT_TOKENS=64,
+)
+class UsageHistoryTests(ProjectTestCase):
+    def setUp(self):
+        super().setUp()
+        self.user = get_user_model().objects.get(username='demo')
+        self.wallet = self.user.wallet
+        self.value_model = CatalogModel.objects.get(display_name='GPT-5.6 Luna')
+        self.premium_model = CatalogModel.objects.get(display_name='GPT-5.6 Sol')
+        self.client.force_login(self.user)
+        self.network_guard = patch(
+            'requests.sessions.Session.send',
+            side_effect=AssertionError('Unexpected network request in offline test.'),
+        )
+        self.network_guard.start()
+        self.addCleanup(self.network_guard.stop)
+
+    def add_usage(self, user, model, credits, title, created_at=None, deleted=False, mode='mock'):
+        conversation = Conversation.objects.create(user=user, title=title)
+        exchange = ChatExchange.objects.create(
+            user=user,
+            model=model,
+            conversation=conversation,
+            prompt=f'Prompt for {title}',
+            reply='Stored reply',
+            input_tokens=17,
+            output_tokens=9,
+            input_tokens_estimated=False,
+            output_tokens_estimated=False,
+            credits_charged=credits,
+            mode=mode,
+        )
+        entry = apply_wallet_transaction(
+            user.wallet,
+            -credits,
+            WalletTransaction.Type.USAGE,
+            exchange=exchange,
+        )
+        if created_at:
+            WalletTransaction.objects.filter(pk=entry.pk).update(created_at=created_at)
+            entry.refresh_from_db()
+        if deleted:
+            conversation.deleted_at = created_at or timezone.now()
+            conversation.save(update_fields=('deleted_at',))
+        return entry, exchange, conversation
+
+    def ledger_spend(self, queryset):
+        return -(queryset.aggregate(total=Sum('amount'))['total'] or 0)
+
+    def test_both_totals_reconcile_to_ledger_and_deleted_charges_remain_visible(self):
+        today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
+        at_yesterday = timezone.make_aware(datetime.combine(yesterday, time(12)))
+        at_today = timezone.make_aware(datetime.combine(today, time(12)))
+        self.premium_model.is_active = False
+        self.premium_model.save(update_fields=('is_active',))
+        old_entry, _, _ = self.add_usage(
+            self.user, self.value_model, 3, 'Older active chat', at_yesterday,
+        )
+        deleted_entry, deleted_exchange, _ = self.add_usage(
+            self.user, self.premium_model, 5, 'Archived model chat', at_today,
+            deleted=True, mode=ChatExchange.Mode.REAL,
+        )
+        newest_entry, _, _ = self.add_usage(
+            self.user, self.value_model, 7, 'Newest chat', at_today + timedelta(minutes=1),
+        )
+        usage = WalletTransaction.objects.filter(
+            wallet=self.wallet,
+            transaction_type=WalletTransaction.Type.USAGE,
+        )
+
+        response = self.client.get(reverse('usage_history'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['lifetime_total'], self.ledger_spend(usage))
+        self.assertEqual(response.context['lifetime_total'], 15)
+        self.assertEqual(response.context['filtered_total'], 15)
+        self.assertEqual(response.context['page_obj'].paginator.count, 3)
+        self.assertContains(response, 'Archived model chat')
+        self.assertContains(response, '(deleted chat)')
+        self.assertContains(response, self.value_model.display_name)
+        self.assertContains(response, self.premium_model.display_name)
+        self.assertContains(response, self.premium_model.get_tier_display())
+        self.assertContains(response, '17')
+        self.assertContains(response, '9')
+        self.assertContains(response, 'Real')
+        self.assertContains(response, 'Mock')
+
+        rows = list(response.context['page_obj'].object_list)
+        self.assertEqual([row.pk for row in rows], [newest_entry.pk, deleted_entry.pk, old_entry.pk])
+        self.assertEqual(deleted_exchange.usage_transaction.amount, -5)
+        self.assertEqual(rows[1].credits_charged, -deleted_entry.amount)
+
+        model_filter = self.client.get(reverse('usage_history'), {'model': self.premium_model.pk})
+        expected_model_spend = self.ledger_spend(usage.filter(exchange__model=self.premium_model))
+        self.assertEqual(model_filter.context['lifetime_total'], 15)
+        self.assertEqual(model_filter.context['filtered_total'], expected_model_spend)
+        self.assertEqual(model_filter.context['filtered_total'], 5)
+        self.assertContains(model_filter, '(deleted chat)')
+
+        date_filter = self.client.get(
+            reverse('usage_history'),
+            {'start_date': today.isoformat(), 'end_date': today.isoformat()},
+        )
+        expected_date_spend = self.ledger_spend(
+            usage.filter(created_at__date=today),
+        )
+        self.assertEqual(date_filter.context['lifetime_total'], 15)
+        self.assertEqual(date_filter.context['filtered_total'], expected_date_spend)
+        self.assertEqual(date_filter.context['filtered_total'], 12)
+        model_choices = list(response.context['filter_form'].fields['model'].queryset)
+        self.assertIn(self.premium_model, model_choices)
+
+    def test_filters_are_combined_inclusively_and_invalid_values_show_errors_without_filtering(self):
+        today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
+        at_yesterday = timezone.make_aware(datetime.combine(yesterday, time(12)))
+        at_today = timezone.make_aware(datetime.combine(today, time(12)))
+        self.add_usage(self.user, self.value_model, 2, 'Yesterday value', at_yesterday)
+        self.add_usage(self.user, self.premium_model, 3, 'Today premium', at_today)
+        self.add_usage(self.user, self.value_model, 5, 'Today value', at_today + timedelta(minutes=1))
+
+        combined = self.client.get(
+            reverse('usage_history'),
+            {
+                'model': self.value_model.pk,
+                'start_date': today.isoformat(),
+                'end_date': today.isoformat(),
+            },
+        )
+        self.assertEqual(combined.context['page_obj'].paginator.count, 1)
+        self.assertEqual(combined.context['filtered_total'], 5)
+        self.assertContains(combined, 'Today value')
+        self.assertNotContains(combined, 'Yesterday value')
+        self.assertNotContains(combined, 'Today premium')
+
+        bad_date = self.client.get(
+            reverse('usage_history'),
+            {'start_date': 'not-a-date', 'model': self.value_model.pk},
+        )
+        self.assertEqual(bad_date.status_code, 200)
+        self.assertTrue(bad_date.context['filter_error'])
+        self.assertEqual(bad_date.context['page_obj'].paginator.count, 3)
+        self.assertEqual(bad_date.context['filtered_total'], bad_date.context['lifetime_total'])
+        self.assertContains(bad_date, 'Enter a valid date')
+
+        reversed_dates = self.client.get(
+            reverse('usage_history'),
+            {'start_date': today.isoformat(), 'end_date': yesterday.isoformat()},
+        )
+        self.assertEqual(reversed_dates.status_code, 200)
+        self.assertTrue(reversed_dates.context['filter_error'])
+        self.assertEqual(reversed_dates.context['page_obj'].paginator.count, 3)
+        self.assertContains(reversed_dates, 'Through date must be on or after')
+
+        unknown_model = self.client.get(
+            reverse('usage_history'),
+            {'model': 999999},
+        )
+        self.assertEqual(unknown_model.status_code, 200)
+        self.assertTrue(unknown_model.context['filter_error'])
+        self.assertEqual(unknown_model.context['page_obj'].paginator.count, 3)
+        self.assertEqual(unknown_model.context['filtered_total'], unknown_model.context['lifetime_total'])
+        self.assertContains(unknown_model, 'Select a valid choice')
+
+    def test_cross_user_rows_model_choices_and_totals_are_private(self):
+        self.add_usage(self.user, self.value_model, 2, 'My private usage')
+        other_user = get_user_model().objects.create_user(
+            username='usage-history-other',
+            password='S3cure!Pass-2026',
+        )
+        self.add_usage(other_user, self.premium_model, 11, 'Another users private usage')
+
+        response = self.client.get(reverse('usage_history'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'My private usage')
+        self.assertNotContains(response, 'Another users private usage')
+        self.assertEqual(response.context['page_obj'].paginator.count, 1)
+        self.assertEqual(response.context['lifetime_total'], 2)
+        self.assertEqual(response.context['filtered_total'], 2)
+        choices = list(response.context['filter_form'].fields['model'].queryset)
+        self.assertEqual(choices, [self.value_model])
+
+        other_model_filter = self.client.get(
+            reverse('usage_history'),
+            {'model': self.premium_model.pk},
+        )
+        self.assertEqual(other_model_filter.status_code, 200)
+        self.assertTrue(other_model_filter.context['filter_error'])
+        self.assertEqual(other_model_filter.context['page_obj'].paginator.count, 1)
+        self.assertEqual(other_model_filter.context['filtered_total'], 2)
+        self.assertNotContains(other_model_filter, 'Another users private usage')
+
+    def test_pagination_is_newest_first_and_totals_cover_all_filtered_pages(self):
+        today = timezone.localdate()
+        now = timezone.now()
+        entries = [
+            self.add_usage(
+                self.user,
+                self.value_model,
+                1,
+                f'Paged usage {index:02d}',
+                now - timedelta(minutes=index),
+            )[0]
+            for index in range(21)
+        ]
+        filters = {
+            'model': self.value_model.pk,
+            'start_date': today.isoformat(),
+            'end_date': today.isoformat(),
+        }
+
+        first_page = self.client.get(reverse('usage_history'), filters)
+        page_obj = first_page.context['page_obj']
+        self.assertEqual(page_obj.paginator.per_page, 20)
+        self.assertEqual(page_obj.paginator.count, 21)
+        self.assertEqual(len(page_obj.object_list), 20)
+        self.assertEqual(page_obj.object_list[0].pk, entries[0].pk)
+        self.assertEqual(first_page.context['filtered_total'], 21)
+        self.assertContains(
+            first_page,
+            f'href="{reverse("usage_history")}?page=2&amp;model={self.value_model.pk}'
+            f'&amp;start_date={today.isoformat()}&amp;end_date={today.isoformat()}"',
+        )
+
+        second_page = self.client.get(reverse('usage_history'), {**filters, 'page': 2})
+        self.assertEqual(second_page.context['page_obj'].paginator.count, 21)
+        self.assertEqual(len(second_page.context['page_obj'].object_list), 1)
+        self.assertEqual(second_page.context['filtered_total'], 21)
+
+    def test_history_requires_login_and_uses_bounded_related_queries(self):
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('usage_history')).status_code, 302)
+        self.client.force_login(self.user)
+        self.add_usage(self.user, self.value_model, 1, 'Single usage')
+        with CaptureQueriesContext(connection) as one_row_queries:
+            one_row_response = self.client.get(reverse('usage_history'))
+        self.assertEqual(one_row_response.status_code, 200)
+
+        for index in range(10):
+            self.add_usage(self.user, self.value_model, 1, f'Additional usage {index}')
+        with CaptureQueriesContext(connection) as many_row_queries:
+            many_row_response = self.client.get(reverse('usage_history'))
+        self.assertEqual(many_row_response.status_code, 200)
+        self.assertLessEqual(len(many_row_queries), len(one_row_queries) + 1)
+
+    def test_usage_links_and_filter_form_preserve_hosted_script_prefix(self):
+        today = timezone.localdate()
+        now = timezone.now()
+        for index in range(21):
+            self.add_usage(
+                self.user,
+                self.value_model,
+                1,
+                f'Prefix usage {index:02d}',
+                now - timedelta(minutes=index),
+            )
+        prefix = '/mounted'
+        previous_prefix = get_script_prefix()
+        set_script_prefix(prefix)
+        try:
+            with override_settings(
+                FORCE_SCRIPT_NAME=prefix,
+                STATIC_URL=f'{prefix}/static/',
+                STRIP_PREFIX_FROM_REDIRECTS=False,
+            ):
+                response = self.client.get(
+                    f'/wallet/usage/?model={self.value_model.pk}'
+                    f'&start_date={today.isoformat()}&end_date={today.isoformat()}',
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f'action="{reverse("usage_history")}"')
+                self.assertContains(
+                    response,
+                    f'href="{reverse("usage_history")}?page=2&amp;model={self.value_model.pk}'
+                    f'&amp;start_date={today.isoformat()}&amp;end_date={today.isoformat()}"',
+                )
+                wallet_page = self.client.get('/wallet/top-up/')
+                self.assertContains(wallet_page, f'href="{reverse("usage_history")}"')
+                self.assertContains(wallet_page, f'action="{reverse("wallet_top_up")}"')
         finally:
             set_script_prefix(previous_prefix)

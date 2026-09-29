@@ -13,6 +13,8 @@
     {% if user.is_authenticated %}
       <div class="session-controls">
         <span class="signed-in">{{ user.username }}</span>
+        <span class="wallet-balance">{{ wallet_balance|default_if_none:0 }} credits</span>
+        <a href="{% url 'wallet_top_up' %}">Top up</a>
         <form method="post" action="{% url 'account_logout' %}">
           {% csrf_token %}
           <button class="quiet-button" type="submit">Log out</button>

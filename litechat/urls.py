@@ -22,4 +22,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', RedirectView.as_view(pattern_name='account_login', permanent=False)),
     path('accounts/', include('core.urls')),
+    path('wallet/', include('core.wallet_urls')),
 ]

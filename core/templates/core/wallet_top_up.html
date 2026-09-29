@@ -1,0 +1,45 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Wallet | LiteChat{% endblock %}
+
+{% block content %}
+  <section class="account-card wallet-card">
+    <p class="eyebrow">Credit wallet</p>
+    <h1>Top up credits</h1>
+    <p class="intro">Current balance: <strong>{{ wallet.balance }} credits</strong></p>
+    <p class="fake-payment-note">This is a simulated payment. No money will be charged.</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button class="primary-button" type="submit">Confirm fake top-up</button>
+    </form>
+  </section>
+
+  <section class="transaction-history" aria-labelledby="transaction-heading">
+    <h2 id="transaction-heading">Transaction history</h2>
+    {% if transactions %}
+      <div class="transaction-scroll">
+        <table class="transaction-table">
+          <thead>
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in transactions %}
+              <tr>
+                <td>{{ entry.get_transaction_type_display }}</td>
+                <td>{{ entry.amount }} credits</td>
+                <td>{{ entry.created_at|date:"Y-m-d H:i" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No wallet transactions yet.</p>
+    {% endif %}
+  </section>
+{% endblock %}

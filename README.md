@@ -38,3 +38,11 @@ Signed-in users see their credit balance in the site header. New accounts and th
 ## Model Catalog
 
 Browse active provisional models at <http://localhost:8000/models/>. The picker groups them by provider, shows tier and input/output credit prices, and allows a temporary in-page selection; it does not make a model call or persist a preference. Staff can change availability in Django admin by editing the catalog's **Active** column. See `doc/wiki/model-catalog.md` for the provisional catalog and price ladder; its IDs and invented credit prices are not official.
+
+## Metered Chat
+
+After logging in, open <http://localhost:8000/chat/> to choose an active model and send a prompt. If no applicable proxy endpoint is configured, the app uses an offline MOCK backend: replies are clearly labeled, token counts are estimated, and the exchange is charged using the catalog's provisional rates.
+
+When no applicable proxy endpoint is configured, the app uses MOCK. If an endpoint is configured, the app requires the selected provider's environment credential and `LLM_PROXY_REQUEST_STYLE` (`openai_compatible` or `provider_native`); missing configuration or a failed request returns an error and never falls back to MOCK. Configure `LLM_PROXY_BASE_URL` or a provider-specific `OPENAI_PROXY_BASE_URL`, `ANTHROPIC_PROXY_BASE_URL`, or `GOOGLE_PROXY_BASE_URL` override, the corresponding `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_API_KEY`, and `LLM_MAX_OUTPUT_TOKENS` in your local `.env`. The proxy request contract is not confirmed. Never commit, print, or log credential values or proxy endpoint values.
+
+Chat pre-checks affordability using an estimate and does not reserve credits. After a successful reply, it records the exchange and usage debit atomically. If the balance changes before the debit and is then insufficient, the reply is discarded with no charge and the user is asked to retry; the provider may still have incurred cost. Configured proxy failures show an error, never fall back to MOCK, and are not charged.

@@ -16,8 +16,9 @@
 - [x] Add a key-redaction test that injects only a generated synthetic non-secret sentinel into a mocked provider exception and asserts that it is absent from captured logs and rendered errors. Never use a real key in the test suite.
 - [x] Update README and `doc/wiki/` with chat use, mock-default behavior, REAL proxy configuration variable names, per-exchange metering, provisional model IDs, and the no-reservation concurrency/provider-cost limitation. Include no credentials or proxy URL values.
 - [x] Run Django checks/tests and verify a fresh migration works in MOCK mode with network access blocked.
-- [ ] Clone into `/tmp`, follow only README setup, confirm migrations/server startup, demo login, and a charged mock exchange with a linked usage ledger; remove the temporary clone.
-- [ ] Review and commit with Conventional Commits, merge to `main`, verify the app after merge, and push to `origin main`.
+- [x] Clone into `/tmp`, follow only README setup, confirm migrations/server startup, demo login, and a charged mock exchange with a linked usage ledger; remove the temporary clone.
+- [x] Review and commit with Conventional Commits.
+- [ ] Merge to `main`, verify the app after merge, and push to `origin main`.
 
 ## Approved Runtime Decisions
 

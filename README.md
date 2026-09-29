@@ -21,11 +21,11 @@ The development server is available at <http://localhost:8000/>; the site root r
 
 `.env.example` contains placeholders for local development. Replace them in your local `.env` as needed; never commit `.env` or real provider credentials.
 
-For hosted development environments, add the assigned hostname to the comma-separated `ALLOWED_HOSTS` setting and its full origin (including `http://` or `https://`) to `CSRF_TRUSTED_ORIGINS` in `.env`. See the commented placeholders in `.env.example`; do not commit a specific hosted hostname.
+For hosted development environments, add the assigned hostname (without a scheme or path) to `ALLOWED_HOSTS` and its full origin (scheme plus hostname, without a path prefix) to `CSRF_TRUSTED_ORIGINS` in `.env`. If the host mounts the app under a path prefix and does not pass WSGI `SCRIPT_NAME`, set `FORCE_SCRIPT_NAME` to that prefix so Django reversals, redirects, and static URLs stay under the mount. See the commented placeholders in `.env.example`; do not commit a specific hosted hostname.
 
 ## Hosted Preview Navigation
 
-The signed-in header links and logout action use named Django routes. If a hosted preview shows a navigation or method error and no matching request appears in the `runserver` terminal, the request is being handled or misrouted before it reaches Django. Check that the preview preserves the app's origin/path prefix and forwards both GET and POST requests; for a path-mounted WSGI deployment, the host must provide the correct `SCRIPT_NAME`. A direct curl POST without a browser session's CSRF cookie/token is expected to receive HTTP 403.
+The signed-in header links and logout action use named Django routes. If a hosted preview shows a navigation or method error and no matching request appears in the `runserver` terminal, the request is being handled or misrouted before it reaches Django. Check that the preview preserves the app's origin/path prefix and forwards both GET and POST requests; for a path-mounted WSGI deployment, the host must provide the correct `SCRIPT_NAME` or configure `FORCE_SCRIPT_NAME`. A direct curl POST without a browser session's CSRF cookie/token is expected to receive HTTP 403.
 
 ## Accounts
 

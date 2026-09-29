@@ -178,6 +178,130 @@ input:focus {
   color: #174d40;
 }
 
+.catalog-heading {
+  margin-bottom: 2rem;
+}
+
+.catalog-heading .intro {
+  max-width: 42rem;
+  margin-bottom: 0;
+}
+
+.selected-model {
+  padding: 0.85rem 1rem;
+  border: 1px solid #b6d4c5;
+  border-radius: 0.6rem;
+  background: #eaf4ee;
+  color: #174d40;
+}
+
+.provider-group {
+  margin: 2rem 0;
+}
+
+.provider-group h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1.2rem;
+  letter-spacing: -0.03em;
+}
+
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 0.8rem;
+}
+
+.model-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid #e2e4dc;
+  border-radius: 0.75rem;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 400;
+}
+
+.model-option:has(input:checked) {
+  border-color: #176b56;
+  box-shadow: 0 0 0 2px #176b561c;
+}
+
+.model-option input {
+  flex: 0 0 auto;
+  width: 1rem;
+  min-height: 1rem;
+  margin-top: 0.15rem;
+  accent-color: #176b56;
+}
+
+.model-option-content,
+.model-title-row,
+.model-prices {
+  display: flex;
+}
+
+.model-option-content {
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.model-title-row {
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tier-badge {
+  padding: 0.2rem 0.45rem;
+  border-radius: 99px;
+  background: #eef1e9;
+  color: #47554e;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.tier-premium {
+  background: #f5e9d4;
+  color: #77521b;
+}
+
+.tier-value {
+  background: #e7f2eb;
+  color: #176b56;
+}
+
+.model-id {
+  color: #68746f;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.model-prices {
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  color: #34423d;
+  font-size: 0.82rem;
+}
+
+.catalog-select-button {
+  width: auto;
+  min-width: 13rem;
+  padding: 0 1.2rem;
+}
+
+.empty-catalog {
+  padding: 1.5rem;
+  border: 1px dashed #cbd4cc;
+  border-radius: 0.7rem;
+  color: #68746f;
+}
+
 .fake-payment-note {
   padding: 0.7rem 0.8rem;
   border-left: 3px solid #d4a756;

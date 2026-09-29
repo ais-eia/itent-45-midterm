@@ -1,12 +1,14 @@
+from itertools import groupby
+
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, FormView
+from django.views.generic import CreateView, FormView, TemplateView
 
 from .forms import TopUpForm
-from .models import WalletTransaction
+from .models import CatalogModel, WalletTransaction
 from .wallets import apply_wallet_transaction
 
 
@@ -40,4 +42,29 @@ class WalletTopUpView(LoginRequiredMixin, FormView):
         wallet = self.request.user.wallet
         context['wallet'] = wallet
         context['transactions'] = wallet.transactions.all()
+        return context
+
+
+class CatalogPickerView(TemplateView):
+    template_name = 'core/model_picker.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        models = list(
+            CatalogModel.objects.filter(is_active=True).order_by(
+                'provider',
+                'tier',
+                'display_name',
+            )
+        )
+        provider_labels = dict(CatalogModel.Provider.choices)
+        context['provider_groups'] = [
+            {'provider': provider_labels[provider], 'models': list(group)}
+            for provider, group in groupby(models, key=lambda model: model.provider)
+        ]
+        selected_id = self.request.GET.get('selected')
+        context['selected_model'] = next(
+            (model for model in models if str(model.pk) == selected_id),
+            None,
+        )
         return context

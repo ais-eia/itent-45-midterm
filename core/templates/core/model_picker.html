@@ -1,0 +1,53 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Model catalog | LiteChat{% endblock %}
+
+{% block content %}
+  <section class="catalog-heading">
+    <p class="eyebrow">Model catalog</p>
+    <h1>Choose a model</h1>
+    <p class="intro">Prices are provisional credits per 1,000 tokens. Model IDs are unverified placeholders. No model calls are made from this page.</p>
+  </section>
+
+  {% if selected_model %}
+    <p class="selected-model" role="status">
+      Selected: <strong>{{ selected_model.display_name }}</strong>. This choice is not saved and is not connected to chat yet.
+    </p>
+  {% endif %}
+
+  {% if provider_groups %}
+    <form method="get" class="catalog-picker">
+      {% for group in provider_groups %}
+        <section class="provider-group" aria-labelledby="provider-{{ forloop.counter }}">
+          <h2 id="provider-{{ forloop.counter }}">{{ group.provider }}</h2>
+          <div class="model-grid">
+            {% for model in group.models %}
+              <label class="model-option">
+                <input
+                  type="radio"
+                  name="selected"
+                  value="{{ model.pk }}"
+                  {% if selected_model and selected_model.pk == model.pk %}checked{% endif %}
+                >
+                <span class="model-option-content">
+                  <span class="model-title-row">
+                    <strong>{{ model.display_name }}</strong>
+                    <span class="tier-badge tier-{{ model.tier }}">{{ model.get_tier_display }}</span>
+                  </span>
+                  <span class="model-id">Provisional ID: <code>{{ model.model_id }}</code></span>
+                  <span class="model-prices">
+                    <span>Input <strong>{{ model.input_credits_per_1k_tokens }}</strong> credits / 1k</span>
+                    <span>Output <strong>{{ model.output_credits_per_1k_tokens }}</strong> credits / 1k</span>
+                  </span>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+      <button class="primary-button catalog-select-button" type="submit">Choose selected model</button>
+    </form>
+  {% else %}
+    <p class="empty-catalog">No models are currently active.</p>
+  {% endif %}
+{% endblock %}

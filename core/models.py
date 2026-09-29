@@ -52,3 +52,44 @@ class WalletTransaction(models.Model):
 
     def __str__(self):
         return f'{self.get_transaction_type_display()}: {self.amount} credits'
+
+
+class CatalogModel(models.Model):
+    class Provider(models.TextChoices):
+        OPENAI = 'openai', 'OpenAI'
+        ANTHROPIC = 'anthropic', 'Anthropic'
+        GOOGLE = 'google', 'Google'
+
+    class Tier(models.TextChoices):
+        VALUE = 'value', 'Value'
+        STANDARD = 'standard', 'Standard'
+        PREMIUM = 'premium', 'Premium'
+
+    provider = models.CharField(max_length=16, choices=Provider.choices)
+    display_name = models.CharField(max_length=100)
+    model_id = models.CharField(max_length=100)
+    tier = models.CharField(max_length=16, choices=Tier.choices)
+    input_credits_per_1k_tokens = models.PositiveIntegerField()
+    output_credits_per_1k_tokens = models.PositiveIntegerField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('provider', 'tier', 'display_name')
+        constraints = [
+            models.UniqueConstraint(
+                fields=('provider', 'model_id'),
+                name='catalog_provider_model_id_unique',
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(provider__in=('openai', 'anthropic', 'google'))
+                    & Q(tier__in=('value', 'standard', 'premium'))
+                    & Q(input_credits_per_1k_tokens__gt=0)
+                    & Q(output_credits_per_1k_tokens__gt=0)
+                ),
+                name='catalog_provider_tier_prices_valid',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.display_name} ({self.get_provider_display()})'

@@ -18,9 +18,12 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
 
+from core.views import CatalogPickerView
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', RedirectView.as_view(pattern_name='account_login', permanent=False)),
     path('accounts/', include('core.urls')),
     path('wallet/', include('core.wallet_urls')),
+    path('models/', CatalogPickerView.as_view(), name='model_picker'),
 ]

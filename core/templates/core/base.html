@@ -30,7 +30,7 @@
       </nav>
     {% endif %}
   </header>
-  <main class="page-shell">
+  <main class="page-shell {% block page_class %}{% endblock %}">
     {% for message in messages %}
       <p class="notice">{{ message }}</p>
     {% endfor %}

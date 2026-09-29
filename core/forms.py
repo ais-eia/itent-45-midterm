@@ -31,3 +31,11 @@ class ChatForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['model'].queryset = CatalogModel.objects.filter(is_active=True)
+
+
+class ConversationTitleForm(forms.Form):
+    title = forms.CharField(max_length=80, strip=True, label='Conversation title')
+
+
+class ConversationTitleForm(forms.Form):
+    title = forms.CharField(max_length=80, strip=True, label='Conversation title')

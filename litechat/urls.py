@@ -18,7 +18,12 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from core.views import CatalogPickerView, ChatView
+from core.views import (
+    CatalogPickerView,
+    ChatView,
+    delete_conversation,
+    rename_conversation,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -31,4 +36,15 @@ urlpatterns = [
     path('wallet/', include('core.wallet_urls')),
     path('models/', CatalogPickerView.as_view(), name='model_picker'),
     path('chat/', ChatView.as_view(), name='chat'),
+    path('chat/<int:conversation_id>/', ChatView.as_view(), name='conversation_chat'),
+    path(
+        'chat/<int:conversation_id>/rename/',
+        rename_conversation,
+        name='conversation_rename',
+    ),
+    path(
+        'chat/<int:conversation_id>/delete/',
+        delete_conversation,
+        name='conversation_delete',
+    ),
 ]

@@ -1,15 +1,20 @@
 from itertools import groupby
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 from django.db import transaction
+from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.views.generic import CreateView, FormView, TemplateView
 
 from .chat_service import InsufficientPreflightCredits, create_exchange
-from .forms import ChatForm, TopUpForm
-from .models import CatalogModel, ChatExchange, WalletTransaction
+from .forms import ChatForm, ConversationTitleForm, TopUpForm
+from .models import CatalogModel, ChatExchange, Conversation, WalletTransaction
 from .providers import ProviderError
 from .wallets import InsufficientCredits, apply_wallet_transaction
 
@@ -43,7 +48,9 @@ class WalletTopUpView(LoginRequiredMixin, FormView):
         context = super().get_context_data(**kwargs)
         wallet = self.request.user.wallet
         context['wallet'] = wallet
-        context['transactions'] = wallet.transactions.all()
+        context['transactions'] = wallet.transactions.select_related(
+            'exchange__conversation',
+        )
         return context
 
 
@@ -75,14 +82,29 @@ class CatalogPickerView(TemplateView):
 class ChatView(LoginRequiredMixin, FormView):
     form_class = ChatForm
     template_name = 'core/chat.html'
-    success_url = reverse_lazy('chat')
+
+    def get_conversation(self):
+        if not hasattr(self, '_conversation'):
+            conversation_id = self.kwargs.get('conversation_id')
+            self._conversation = None
+            if conversation_id is not None:
+                self._conversation = get_object_or_404(
+                    Conversation.objects.filter(
+                        user=self.request.user,
+                        deleted_at__isnull=True,
+                    ),
+                    pk=conversation_id,
+                )
+        return self._conversation
 
     def form_valid(self, form):
+        conversation = self.get_conversation()
         try:
-            create_exchange(
+            exchange = create_exchange(
                 self.request.user,
                 form.cleaned_data['model'],
                 form.cleaned_data['prompt'],
+                conversation=conversation,
             )
         except InsufficientPreflightCredits:
             form.add_error(
@@ -102,11 +124,66 @@ class ChatView(LoginRequiredMixin, FormView):
         except Exception:
             form.add_error(None, 'The reply could not be saved or charged. Nothing was charged; please retry.')
             return self.form_invalid(form)
-        return super().form_valid(form)
+        return redirect('conversation_chat', conversation_id=exchange.conversation_id)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['exchanges'] = ChatExchange.objects.filter(
-            user=self.request.user,
-        ).select_related('model')
+        conversation = self.get_conversation()
+        context['conversation'] = conversation
+        context['exchanges'] = (
+            conversation.exchanges.filter(
+                user=self.request.user,
+            ).select_related('model').order_by('created_at', 'pk')
+            if conversation
+            else ()
+        )
+        context['page_obj'] = Paginator(
+            Conversation.objects.filter(
+                user=self.request.user,
+                deleted_at__isnull=True,
+            ).order_by('-last_activity_at', '-pk'),
+            20,
+        ).get_page(self.request.GET.get('page'))
         return context
+
+
+@login_required
+def rename_conversation(request, conversation_id):
+    conversation = get_object_or_404(
+        Conversation.objects.filter(user=request.user, deleted_at__isnull=True),
+        pk=conversation_id,
+    )
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    form = ConversationTitleForm(request.POST)
+    if form.is_valid():
+        conversation.title = form.cleaned_data['title']
+        conversation.save(update_fields=('title',))
+        messages.success(request, 'Conversation renamed.')
+    else:
+        messages.error(request, 'Enter a non-empty title of at most 80 characters.')
+    return redirect('conversation_chat', conversation_id=conversation.pk)
+
+
+@login_required
+def delete_conversation(request, conversation_id):
+    conversation = get_object_or_404(
+        Conversation.objects.filter(user=request.user, deleted_at__isnull=True),
+        pk=conversation_id,
+    )
+    if request.method == 'GET':
+        return render(
+            request,
+            'core/conversation_confirm_delete.html',
+            {'conversation': conversation},
+        )
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['GET', 'POST'])
+    if request.POST.get('confirm') != 'yes':
+        return HttpResponseBadRequest('Explicit delete confirmation is required.')
+
+    conversation.deleted_at = timezone.now()
+    conversation.save(update_fields=('deleted_at',))
+    messages.success(request, 'Conversation deleted from your chat list.')
+    return redirect('chat')

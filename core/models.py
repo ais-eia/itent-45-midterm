@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
+from django.utils import timezone
 
 
 class Wallet(models.Model):
@@ -125,6 +127,11 @@ class ChatExchange(models.Model):
         on_delete=models.PROTECT,
         related_name='exchanges',
     )
+    conversation = models.ForeignKey(
+        'Conversation',
+        on_delete=models.PROTECT,
+        related_name='exchanges',
+    )
     prompt = models.TextField()
     reply = models.TextField()
     input_tokens = models.PositiveIntegerField()
@@ -140,3 +147,27 @@ class ChatExchange(models.Model):
 
     def __str__(self):
         return f'{self.user} - {self.model.display_name} ({self.credits_charged} credits)'
+
+
+class Conversation(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversations',
+    )
+    title = models.CharField(max_length=80)
+    created_at = models.DateTimeField(default=timezone.now)
+    last_activity_at = models.DateTimeField(default=timezone.now)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-last_activity_at', '-pk')
+        indexes = [
+            models.Index(
+                fields=('user', '-last_activity_at'),
+                name='conversation_user_activity_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return self.title

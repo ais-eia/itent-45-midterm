@@ -30,7 +30,12 @@
           <tbody>
             {% for entry in transactions %}
               <tr>
-                <td>{{ entry.get_transaction_type_display }}</td>
+                <td>
+                  {{ entry.get_transaction_type_display }}
+                  {% if entry.transaction_type == 'usage' and entry.exchange.conversation.deleted_at %}
+                    <span class="muted">(deleted chat)</span>
+                  {% endif %}
+                </td>
                 <td>{{ entry.amount }} credits</td>
                 <td>{{ entry.created_at|date:"Y-m-d H:i" }}</td>
               </tr>

@@ -1,0 +1,17 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Delete chat | LiteChat{% endblock %}
+
+{% block content %}
+  <section class="account-card">
+    <p class="eyebrow">Confirm deletion</p>
+    <h1>Delete this chat?</h1>
+    <p class="intro">&quot;{{ conversation.title }}&quot; will be removed from your saved chat list. Its exchanges and credit ledger records will be retained for audit.</p>
+    <form method="post" action="{% url 'conversation_delete' conversation.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="confirm" value="yes">
+      <button class="danger-button" type="submit">Delete chat</button>
+      <a class="cancel-link" href="{% url 'conversation_chat' conversation.pk %}">Cancel</a>
+    </form>
+  </section>
+{% endblock %}

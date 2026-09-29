@@ -25,3 +25,15 @@ def credits_for_usage(model, input_tokens, output_tokens):
         + output_tokens * model.output_credits_per_1k_tokens
     )
     return (total + 999) // 1000
+
+
+def estimate_request_cost(model, prompt, max_output_tokens):
+    if not isinstance(max_output_tokens, int) or isinstance(max_output_tokens, bool) or max_output_tokens < 1:
+        raise ValueError('The output-token allowance must be a positive integer.')
+
+    input_tokens = estimate_tokens(prompt)
+    return {
+        'estimated_input_tokens': input_tokens,
+        'output_token_allowance': max_output_tokens,
+        'estimated_credits': credits_for_usage(model, input_tokens, max_output_tokens),
+    }

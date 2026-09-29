@@ -21,6 +21,7 @@ from django.views.generic import RedirectView
 from core.views import (
     CatalogPickerView,
     ChatView,
+    chat_cost_estimate,
     delete_conversation,
     rename_conversation,
 )
@@ -34,8 +35,9 @@ urlpatterns = [
     ),
     path('accounts/', include('core.urls')),
     path('wallet/', include('core.wallet_urls')),
-    path('models/', CatalogPickerView.as_view(), name='model_picker'),
-    path('chat/', ChatView.as_view(), name='chat'),
+path('models/', CatalogPickerView.as_view(), name='model_picker'),
+path('chat/cost-estimate/', chat_cost_estimate, name='chat_cost_estimate'),
+path('chat/', ChatView.as_view(), name='chat'),
     path('chat/<int:conversation_id>/', ChatView.as_view(), name='conversation_chat'),
     path(
         'chat/<int:conversation_id>/rename/',

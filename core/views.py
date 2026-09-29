@@ -4,18 +4,21 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Sum
 from django.db.models.functions import Abs
-from django.http import HttpResponseBadRequest, HttpResponseNotAllowed
+from django.http import HttpResponseBadRequest, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, FormView, TemplateView
 
 from .chat_service import InsufficientPreflightCredits, create_exchange
 from .forms import ChatForm, ConversationTitleForm, TopUpForm, UsageHistoryFilterForm
+from .metering import estimate_request_cost
 from .models import CatalogModel, ChatExchange, Conversation, WalletTransaction
 from .providers import ProviderError
 from .wallets import InsufficientCredits, apply_wallet_transaction
@@ -257,3 +260,29 @@ def delete_conversation(request, conversation_id):
     conversation.save(update_fields=('deleted_at',))
     messages.success(request, 'Conversation deleted from your chat list.')
     return redirect('chat')
+
+
+@require_POST
+def chat_cost_estimate(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication is required.'}, status=401)
+
+    form = ChatForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'errors': form.errors.get_json_data()}, status=400)
+
+    try:
+        estimate = estimate_request_cost(
+            form.cleaned_data['model'],
+            form.cleaned_data['prompt'],
+            settings.LLM_MAX_OUTPUT_TOKENS,
+        )
+    except ValueError:
+        return JsonResponse({'error': 'The estimate is currently unavailable.'}, status=503)
+
+    balance = request.user.wallet.balance
+    return JsonResponse({
+        **estimate,
+        'balance': balance,
+        'exceeds_balance': estimate['estimated_credits'] > balance,
+    })

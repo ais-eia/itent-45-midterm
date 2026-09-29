@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .metering import credits_for_usage, estimate_tokens
+from .metering import credits_for_usage, estimate_request_cost, estimate_tokens
 from .models import CatalogModel, ChatExchange, Conversation, WalletTransaction
 from .providers import ProviderError, get_backend
 from .wallets import InsufficientCredits, apply_wallet_transaction
@@ -36,12 +36,10 @@ def create_exchange(user, model, prompt, conversation=None):
         raise ProviderError('The configured output-token limit is invalid.')
 
     wallet = user.wallet
-    estimated_input_tokens = estimate_tokens(prompt)
-    preflight_credits = credits_for_usage(
-        model,
-        estimated_input_tokens,
-        max_output_tokens,
-    )
+    try:
+        preflight_credits = estimate_request_cost(model, prompt, max_output_tokens)['estimated_credits']
+    except ValueError as error:
+        raise ProviderError('The configured output-token limit is invalid.') from error
     if wallet.balance < preflight_credits:
         raise InsufficientPreflightCredits
 

@@ -18,7 +18,7 @@ from django.urls import get_script_prefix, resolve, reverse, set_script_prefix
 from django.utils import timezone
 
 from .models import CatalogModel, ChatExchange, Conversation, WalletTransaction
-from .metering import credits_for_usage, estimate_tokens
+from .metering import credits_for_usage, estimate_request_cost, estimate_tokens
 from .providers import (
     MockBackend,
     ProxyBackend,
@@ -256,6 +256,12 @@ class HeaderNavigationTests(ProjectTestCase):
                     self.assertContains(page, f'href="{reverse(route_name)}"')
                 self.assertContains(page, f'action="{reverse("account_logout")}"')
                 self.assertContains(page, f'href="{prefix}/static/core/accounts.css"')
+                chat_page = self.client.get('/chat/')
+                self.assertContains(
+                    chat_page,
+                    f'data-cost-estimate-url="{reverse("chat_cost_estimate")}"',
+                )
+                self.assertContains(chat_page, f'src="{prefix}/static/core/chat-estimate.js"')
 
                 root = self.client.get('/')
                 self.assertEqual(root['Location'], reverse('account_login'))
@@ -686,6 +692,8 @@ class CatalogPickerTests(ProjectTestCase):
 
 
 @override_settings(
+    FORCE_SCRIPT_NAME=None,
+    STATIC_URL='static/',
     LLM_PROXY_BASE_URL='',
     OPENAI_PROXY_BASE_URL='',
     ANTHROPIC_PROXY_BASE_URL='',
@@ -757,6 +765,134 @@ class MeteredChatTests(ProjectTestCase):
         self.assertContains(response, 'balance is too low')
         self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
         self.assertEqual(self.wallet.transactions.count(), 1)
+
+    def test_estimate_endpoint_matches_preflight_and_has_no_side_effects(self):
+        prompt = 'Estimate this message before sending.'
+        expected = estimate_request_cost(self.model, prompt, 64)
+        transactions_before = self.wallet.transactions.count()
+
+        response = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': self.model.pk, 'prompt': prompt},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['estimated_credits'], expected['estimated_credits'])
+        self.assertEqual(payload['estimated_input_tokens'], expected['estimated_input_tokens'])
+        self.assertEqual(payload['output_token_allowance'], 64)
+        self.assertEqual(payload['balance'], 100)
+        self.assertFalse(payload['exceeds_balance'])
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+        self.assertEqual(self.wallet.transactions.count(), transactions_before)
+
+        self.wallet.balance = expected['estimated_credits'] - 1
+        self.wallet.save(update_fields=('balance',))
+        with patch(
+            'core.chat_service.estimate_request_cost',
+            wraps=estimate_request_cost,
+        ) as shared_estimator, patch('core.chat_service.get_backend') as backend_factory:
+            blocked = self.client.post(
+                reverse('chat'),
+                {'model': self.model.pk, 'prompt': prompt},
+            )
+
+        shared_estimator.assert_called_once_with(self.model, prompt, 64)
+        backend_factory.assert_not_called()
+        self.assertContains(blocked, 'balance is too low')
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+
+    def test_estimate_endpoint_warns_when_cost_exceeds_balance(self):
+        self.wallet.balance = 0
+        self.wallet.save(update_fields=('balance',))
+
+        response = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': self.model.pk, 'prompt': 'Estimate this message.'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['exceeds_balance'])
+        self.assertGreater(response.json()['estimated_credits'], response.json()['balance'])
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+
+    def test_estimate_changes_with_model_and_prompt(self):
+        prompt = 'A short prompt.'
+        value_estimate = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': self.model.pk, 'prompt': prompt},
+        ).json()
+        premium_model = CatalogModel.objects.get(display_name='GPT-5.6 Sol')
+        premium_estimate = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': premium_model.pk, 'prompt': prompt},
+        ).json()
+        longer_estimate = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': self.model.pk, 'prompt': prompt * 30},
+        ).json()
+
+        self.assertGreater(premium_estimate['estimated_credits'], value_estimate['estimated_credits'])
+        self.assertGreater(longer_estimate['estimated_input_tokens'], value_estimate['estimated_input_tokens'])
+        self.assertGreaterEqual(longer_estimate['estimated_credits'], value_estimate['estimated_credits'])
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+
+    def test_estimate_endpoint_rejects_inactive_unknown_and_anonymous_requests(self):
+        inactive = CatalogModel.objects.get(display_name='GPT-5.6 Terra')
+        inactive.is_active = False
+        inactive.save(update_fields=('is_active',))
+
+        inactive_response = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': inactive.pk, 'prompt': 'A prompt.'},
+        )
+        unknown_response = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': 999999, 'prompt': 'A prompt.'},
+        )
+
+        self.assertEqual(inactive_response.status_code, 400)
+        self.assertEqual(unknown_response.status_code, 400)
+        blank_prompt_response = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': self.model.pk, 'prompt': '   '},
+        )
+        self.assertEqual(blank_prompt_response.status_code, 400)
+        self.client.logout()
+        anonymous_response = self.client.post(
+            reverse('chat_cost_estimate'),
+            {'model': self.model.pk, 'prompt': 'A prompt.'},
+        )
+        self.assertEqual(anonymous_response.status_code, 401)
+
+    def test_estimate_endpoint_requires_post_and_valid_csrf(self):
+        estimate_url = reverse('chat_cost_estimate')
+        self.assertEqual(self.client.get(estimate_url).status_code, 405)
+
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.user)
+        csrf_client.get(reverse('chat'))
+        token = csrf_client.cookies['csrftoken'].value
+        rejected = csrf_client.post(
+            estimate_url,
+            {'model': self.model.pk, 'prompt': 'A prompt.'},
+        )
+        accepted = csrf_client.post(
+            estimate_url,
+            {'model': self.model.pk, 'prompt': 'A prompt.', 'csrfmiddlewaretoken': token},
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(rejected.status_code, 403)
+        self.assertEqual(accepted.status_code, 200)
+
+    def test_chat_page_loads_prefix_safe_estimator_script_and_change_handlers(self):
+        response = self.client.get(reverse('chat'))
+        self.assertContains(response, f'data-cost-estimate-url="{reverse("chat_cost_estimate")}"')
+        self.assertContains(response, 'src="/static/core/chat-estimate.js"')
+        script = Path('core/static/core/chat-estimate.js').read_text(encoding='utf-8')
+        self.assertIn("prompt.addEventListener('input', scheduleEstimate)", script)
+        self.assertIn("model.addEventListener('change', scheduleEstimate)", script)
+        self.assertIn('result.exceeds_balance', script)
 
     def test_inactive_model_is_rejected(self):
         inactive = CatalogModel.objects.get(display_name='GPT-5.6 Terra')

@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{% load static %}
 
 {% block title %}{% if conversation %}{{ conversation.title }}{% else %}New chat{% endif %} | LiteChat{% endblock %}
 {% block page_class %}chat-shell{% endblock %}
@@ -54,12 +55,13 @@
         {% else %}
           {% url 'chat' as submit_url %}
         {% endif %}
-        <form method="post" action="{{ submit_url }}">
+        <form method="post" action="{{ submit_url }}" data-cost-estimate-url="{% url 'chat_cost_estimate' %}" id="chat-form">
           {% csrf_token %}
           {{ form.non_field_errors }}
           {{ form.as_p }}
           <button class="primary-button" type="submit">Send message</button>
         </form>
+        <p id="cost-estimate" class="cost-estimate" role="status" aria-live="polite">Enter a message to estimate its cost.</p>
       </section>
 
       <section class="chat-history" aria-label="Conversation messages">
@@ -103,3 +105,5 @@
     </div>
   </div>
 {% endblock %}
+
+{% block extra_scripts %}<script src="{% static 'core/chat-estimate.js' %}" defer></script>{% endblock %}

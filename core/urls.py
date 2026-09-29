@@ -1,5 +1,5 @@
 from django.contrib.auth import views as auth_views
-from django.urls import path, reverse_lazy
+from django.urls import path
 
 from .views import SignUpView
 
@@ -12,7 +12,7 @@ urlpatterns = [
     ),
     path(
         'logout/',
-        auth_views.LogoutView.as_view(next_page=reverse_lazy('account_login')),
+        auth_views.LogoutView.as_view(next_page='account_login'),
         name='account_logout',
     ),
 ]

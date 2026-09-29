@@ -22,7 +22,11 @@ from core.views import CatalogPickerView, ChatView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', RedirectView.as_view(pattern_name='account_login', permanent=False)),
+    path(
+        '',
+        RedirectView.as_view(pattern_name='account_login', permanent=False),
+        name='site_root',
+    ),
     path('accounts/', include('core.urls')),
     path('wallet/', include('core.wallet_urls')),
     path('models/', CatalogPickerView.as_view(), name='model_picker'),

@@ -48,6 +48,9 @@ ANTHROPIC_PROXY_BASE_URL = os.getenv('ANTHROPIC_PROXY_BASE_URL', '').strip()
 GOOGLE_PROXY_BASE_URL = os.getenv('GOOGLE_PROXY_BASE_URL', '').strip()
 LLM_PROXY_REQUEST_STYLE = os.getenv('LLM_PROXY_REQUEST_STYLE', '').strip().lower()
 LLM_MAX_OUTPUT_TOKENS = int(os.getenv('LLM_MAX_OUTPUT_TOKENS', '512'))
+_script_prefix = os.getenv('FORCE_SCRIPT_NAME', '').strip().strip('/')
+FORCE_SCRIPT_NAME = f'/{_script_prefix}' if _script_prefix else None
+STATIC_URL = f'{FORCE_SCRIPT_NAME}/static/' if FORCE_SCRIPT_NAME else 'static/'
 
 
 # Application definition
@@ -92,7 +95,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'litechat.wsgi.application'
 
-LOGIN_REDIRECT_URL = '/'
+LOGIN_URL = 'account_login'
+LOGIN_REDIRECT_URL = 'site_root'
 
 
 # Database
@@ -139,9 +143,6 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
-
-STATIC_URL = 'static/'
-
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration

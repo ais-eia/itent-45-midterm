@@ -1,6 +1,9 @@
 import logging
 import os
 import secrets
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from django.contrib import admin
@@ -212,6 +215,101 @@ class HeaderNavigationTests(TestCase):
             for route_name in ('chat', 'model_picker', 'wallet_top_up', 'account_logout'):
                 with self.subTest(route=route_name):
                     self.assertContains(response, f'"{reverse(route_name)}"')
+        finally:
+            set_script_prefix(previous_prefix)
+
+    def test_force_script_name_prefixes_header_redirects_and_logout(self):
+        prefix = '/mounted'
+        previous_prefix = get_script_prefix()
+        set_script_prefix(prefix)
+        try:
+            with override_settings(
+                FORCE_SCRIPT_NAME=prefix,
+                STATIC_URL=f'{prefix}/static/',
+                LOGIN_URL='account_login',
+                LOGIN_REDIRECT_URL='site_root',
+            ):
+                page = self.client.get('/accounts/login/')
+                self.assertEqual(page.status_code, 200)
+                for route_name in ('chat', 'model_picker', 'wallet_top_up'):
+                    self.assertContains(page, f'href="{reverse(route_name)}"')
+                self.assertContains(page, f'action="{reverse("account_logout")}"')
+                self.assertContains(page, f'href="{prefix}/static/core/accounts.css"')
+
+                root = self.client.get('/')
+                self.assertEqual(root['Location'], reverse('account_login'))
+
+                guest = Client()
+                protected = guest.get('/chat/')
+                self.assertTrue(protected['Location'].startswith(reverse('account_login')))
+                login = guest.post(
+                    '/accounts/login/',
+                    {'username': 'demo', 'password': 'demo12345'},
+                )
+                self.assertEqual(login['Location'], reverse('site_root'))
+
+                logout_client = Client(enforce_csrf_checks=True)
+                logout_client.force_login(self.user)
+                logout_page = logout_client.get('/accounts/login/')
+                csrf_token = logout_client.cookies['csrftoken'].value
+                self.assertContains(
+                    logout_page,
+                    f'action="{reverse("account_logout")}"',
+                )
+                logout = logout_client.post(
+                    '/accounts/logout/',
+                    HTTP_X_CSRFTOKEN=csrf_token,
+                )
+                self.assertEqual(logout.status_code, 302)
+                self.assertEqual(logout['Location'], reverse('account_login'))
+        finally:
+            set_script_prefix(previous_prefix)
+
+    def test_force_script_name_environment_derives_static_and_route_prefix(self):
+        env = os.environ.copy()
+        env['FORCE_SCRIPT_NAME'] = '/mounted/'
+        env['DJANGO_SETTINGS_MODULE'] = 'litechat.settings'
+        for name in (
+            'LLM_PROXY_BASE_URL',
+            'OPENAI_PROXY_BASE_URL',
+            'ANTHROPIC_PROXY_BASE_URL',
+            'GOOGLE_PROXY_BASE_URL',
+            'OPENAI_API_KEY',
+            'ANTHROPIC_API_KEY',
+            'GOOGLE_API_KEY',
+            'LLM_PROXY_REQUEST_STYLE',
+        ):
+            env[name] = ''
+        check = (
+            'import django; django.setup(); '
+            'from django.conf import settings; '
+            'from django.templatetags.static import static; '
+            'from django.urls import reverse; '
+            'assert settings.FORCE_SCRIPT_NAME == "/mounted"; '
+            'assert settings.STATIC_URL == "/mounted/static/"; '
+            'assert reverse("chat") == "/mounted/chat/"; '
+            'assert static("core/accounts.css") == "/mounted/static/core/accounts.css"'
+        )
+        result = subprocess.run(
+            [sys.executable, '-c', check],
+            cwd=Path(__file__).resolve().parents[1],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, 'FORCE_SCRIPT_NAME must prefix routes and static URLs')
+
+    def test_unset_force_script_name_keeps_root_urls_and_static_path(self):
+        previous_prefix = get_script_prefix()
+        set_script_prefix('/')
+        try:
+            with override_settings(FORCE_SCRIPT_NAME=None, STATIC_URL='static/'):
+                page = self.client.get(reverse('account_login'))
+                self.assertContains(page, 'href="/chat/"')
+                self.assertContains(page, 'action="/accounts/logout/"')
+                self.assertContains(page, 'href="/static/core/accounts.css"')
         finally:
             set_script_prefix(previous_prefix)
 

@@ -12,7 +12,8 @@
 - [x] Add tests for signup success and validation failure, login success and invalid credentials, safe `next` handling, POST logout/session clearing, CSRF protection, and demo account authentication after migrations.
 - [x] Update `README.md` with the account URLs and local-only demo credentials; update `doc/wiki/` with the account flows and seed behavior.
 - [x] Run Django checks and tests, then verify migrations and demo login from a fresh Django test database.
-- [ ] Clone into `/tmp`, follow only the README setup, confirm migrations and server startup, and verify `demo` / `demo12345` login; remove the temporary clone.
-- [ ] Review and commit changes using Conventional Commits, merge the branch to `main`, confirm the app runs after merge, and push to `origin main`.
+- [x] Clone into `/tmp`, follow only the README setup, confirm migrations and server startup, and verify `demo` / `demo12345` login; remove the temporary clone.
+- [x] Review and commit changes using Conventional Commits.
+- [ ] Merge the branch to `main`, confirm the app runs after merge, and push to `origin main`.
 
 Out of scope: custom user model, email verification, password reset, profile fields, roles, billing, chat, provider calls, and model catalog changes.

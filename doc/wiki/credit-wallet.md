@@ -7,3 +7,4 @@
 - Authenticated users see their balance and a top-up link in the shared LiteChat header. The top-up page is `/wallet/top-up/`; it accepts a positive integer credit amount, simulates confirmation without taking payment, and lists the user's timestamped ledger history.
 - There is no credit-to-currency rate, pricing, or real payment integration. Metered chat records a linked `usage` transaction for successful replies.
 - Metered chat pre-checks estimated affordability but does not reserve credits. The final usage debit remains atomic and cannot make the balance negative. If another request changes the balance before settlement and the debit fails, the exchange/reply is discarded without charge and the user is asked to retry; the provider may still have incurred cost for the discarded reply.
+- Session deletion is soft: linked exchanges and usage transactions remain. The wallet transaction history labels usage charges from a deleted chat as `(deleted chat)`.

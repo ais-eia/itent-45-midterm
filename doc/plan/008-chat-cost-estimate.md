@@ -14,7 +14,7 @@
 - [x] Add template and hosted-prefix tests for the estimate endpoint URL, form action, and CSRF wiring; verify client-side updates are triggered by prompt and model changes without introducing a frontend dependency/build step.
 - [x] Update README and `doc/wiki/` to explain the conservative estimate, output-token allowance, balance warning, and the distinction between the pre-send estimate and final metered charge.
 - [x] Run Django checks, migration checks, and the full test suite with network access blocked in MOCK mode.
-- [ ] Clone into `/tmp`, follow only the README setup, confirm migrations/server startup and demo login, and verify the estimate updates for prompt/model changes without changing the wallet or creating an exchange; then remove the temporary clone.
+- [x] Clone into `/tmp`, follow only the README setup, confirm migrations/server startup and demo login, and verify the estimate updates for prompt/model changes without changing the wallet or creating an exchange; then remove the temporary clone.
 - [ ] Review and commit with Conventional Commits, merge to `main`, verify after merge, and push to `origin main`.
 
 ## Decisions Captured

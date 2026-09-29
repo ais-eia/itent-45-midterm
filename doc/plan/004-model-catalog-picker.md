@@ -14,7 +14,7 @@
 - [x] Run Django checks/tests and verify catalog migrations from an empty database.
 - [x] Clone into `/tmp`, follow only the README setup, confirm migrations, catalog contents, server startup, and demo login; then remove the temporary clone.
 - [x] Review and commit with Conventional Commits.
-- [ ] Merge to `main`, confirm the app works after merge, and push to `origin main`.
+- [x] Merge to `main`, confirm the app works after merge, and push to `origin main`.
 
 ## Provisional Data To Seed
 

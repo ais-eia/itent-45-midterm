@@ -15,7 +15,7 @@
 - [x] Add a cross-user privacy test proving rows, filter model choices, filtered total, and lifetime total include only the signed-in user's usage transactions. Add a bounded-query test to detect per-row database queries.
 - [x] Update README and `doc/wiki/` to describe usage-history columns, both totals, filters, deleted-chat inclusion, invalid-filter behavior, and the ledger as the source of truth.
 - [x] Run Django checks, migration checks, the full test suite, and fresh-clone setup from README in MOCK mode; verify usage totals against wallet ledger rows and confirm the page works without a script prefix.
-- [ ] Review, commit feature work with Conventional Commits, clone/verify before merge, merge to `main`, verify the app after merge, and push to `origin main`.
+- [x] Review, commit feature work with Conventional Commits, clone/verify before merge, merge to `main`, verify the app after merge, and push to `origin main`.
 
 ## Decisions Captured
 

@@ -3,5 +3,12 @@ env/
 __pycache__/
 .DS_Store
 *.db
+*.pyc
 db.sqlite3
 staticfiles/
+local_settings.py
+settings_local.py
+settings.local.py
+settings.*.local.py
+local_settings/
+settings_local/

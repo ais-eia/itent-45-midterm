@@ -1,0 +1,21 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Sign up | LiteChat{% endblock %}
+
+{% block content %}
+  <section class="account-card">
+    <p class="eyebrow">Get started</p>
+    <h1>Create your account</h1>
+    {% if user.is_authenticated %}
+      <p class="intro">You are already signed in as <strong>{{ user.username }}</strong>.</p>
+    {% else %}
+      <p class="intro">Choose a username and password to get started.</p>
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="primary-button" type="submit">Create account</button>
+      </form>
+      <p class="form-footer">Already have an account? <a href="{% url 'account_login' %}">Log in</a></p>
+    {% endif %}
+  </section>
+{% endblock %}

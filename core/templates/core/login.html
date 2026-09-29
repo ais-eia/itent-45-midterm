@@ -1,0 +1,27 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Log in | LiteChat{% endblock %}
+
+{% block content %}
+  {% if user.is_authenticated %}
+    <section class="account-card">
+      <p class="eyebrow">Account</p>
+      <h1>You are signed in</h1>
+      <p class="intro">Signed in as <strong>{{ user.username }}</strong>.</p>
+      <p class="muted">The app home page is not available yet.</p>
+    </section>
+  {% else %}
+    <section class="account-card">
+      <p class="eyebrow">Welcome back</p>
+      <h1>Log in</h1>
+      <p class="intro">Continue to LiteChat with your account.</p>
+      <form method="post">
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="{{ redirect_field_name }}" value="{{ next }}">{% endif %}
+        {{ form.as_p }}
+        <button class="primary-button" type="submit">Log in</button>
+      </form>
+      <p class="form-footer">New here? <a href="{% url 'account_signup' %}">Create an account</a></p>
+    </section>
+  {% endif %}
+{% endblock %}

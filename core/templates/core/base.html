@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}LiteChat Accounts{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'core/accounts.css' %}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{% url 'account_login' %}">LiteChat</a>
+    {% if user.is_authenticated %}
+      <div class="session-controls">
+        <span class="signed-in">{{ user.username }}</span>
+        <form method="post" action="{% url 'account_logout' %}">
+          {% csrf_token %}
+          <button class="quiet-button" type="submit">Log out</button>
+        </form>
+      </div>
+    {% else %}
+      <nav class="account-nav" aria-label="Account">
+        <a href="{% url 'account_login' %}">Log in</a>
+        <a href="{% url 'account_signup' %}">Sign up</a>
+      </nav>
+    {% endif %}
+  </header>
+  <main class="page-shell">
+    {% for message in messages %}
+      <p class="notice">{{ message }}</p>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

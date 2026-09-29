@@ -73,6 +73,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'litechat.wsgi.application'
 
+LOGIN_REDIRECT_URL = '/'
+
 
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases

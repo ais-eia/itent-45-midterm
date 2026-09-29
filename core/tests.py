@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.test import Client, TestCase, override_settings
-from django.urls import reverse
+from django.urls import get_script_prefix, reverse, set_script_prefix
 
 from .models import CatalogModel, ChatExchange, WalletTransaction
 from .metering import credits_for_usage, estimate_tokens
@@ -162,6 +162,58 @@ class AccountViewTests(TestCase):
             fetch_redirect_response=False,
         )
         self.assertNotIn('_auth_user_id', client.session)
+
+
+class HeaderNavigationTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.get(username='demo')
+        self.client.force_login(self.user)
+
+    def test_logged_in_header_links_resolve_and_render_successful_pages(self):
+        response = self.client.get(reverse('account_login'))
+        routes = (
+            ('chat', 'Chat'),
+            ('model_picker', 'Models'),
+            ('wallet_top_up', 'Top up'),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for route_name, label in routes:
+            with self.subTest(route=route_name):
+                path = reverse(route_name)
+                self.assertContains(response, f'href="{path}"')
+                self.assertContains(response, label)
+                page = self.client.get(path)
+                self.assertEqual(page.status_code, 200)
+
+    def test_logout_header_form_posts_to_named_route_and_redirects_to_login(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.user)
+        page = client.get(reverse('account_login'))
+        logout_path = reverse('account_logout')
+
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, f'method="post" action="{logout_path}"')
+        self.assertContains(page, 'name="csrfmiddlewaretoken"')
+
+        csrf_token = client.cookies['csrftoken'].value
+        response = client.post(logout_path, HTTP_X_CSRFTOKEN=csrf_token)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('account_login'))
+        self.assertNotIn('_auth_user_id', client.session)
+
+    def test_header_reversals_include_a_host_supplied_script_prefix(self):
+        previous_prefix = get_script_prefix()
+        set_script_prefix('/hosted')
+        try:
+            response = self.client.get('/accounts/login/')
+            self.assertEqual(response.status_code, 200)
+            for route_name in ('chat', 'model_picker', 'wallet_top_up', 'account_logout'):
+                with self.subTest(route=route_name):
+                    self.assertContains(response, f'"{reverse(route_name)}"')
+        finally:
+            set_script_prefix(previous_prefix)
 
 
 class WalletTests(TestCase):

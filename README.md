@@ -30,3 +30,7 @@ For hosted development environments, add the assigned hostname to the comma-sepa
 - While signed in, visit the login page and use its **Log out** button to end the session.
 
 After running migrations, a local demo account is available with username `demo` and password `demo12345`. These public credentials are for local demonstration only; do not use them for real or deployed accounts.
+
+## Credit Wallet
+
+Signed-in users see their credit balance in the site header. New accounts and the demo account receive 100 credits from migrations/signup provisioning. Visit <http://localhost:8000/wallet/top-up/> to add a positive whole-number amount through a simulated top-up; no payment is taken and no currency conversion or credit price is defined. The page lists timestamped wallet transactions, including signup bonuses, top-ups, and future usage deductions.

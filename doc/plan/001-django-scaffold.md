@@ -13,5 +13,5 @@
 - [x] Review the diff and commit in Conventional Commit chunks.
 - [x] Verify a fresh clone using only the README setup steps: dependency install, migrations, and a background server returning the default welcome page; stop the server and remove the clone afterward.
 - [x] Update `AGENTS.md` so the demo-login verification applies only after the user accounts feature exists; for this scaffold, verify migrations and the welcome page from a fresh clone.
-- [ ] Merge to `main` and try pushing to `origin main` after the pre-merge requirement is resolved.
+- [x] Merge to `main` after the fresh-clone checks and push to `origin main`.
 - [x] Update `doc/wiki/` to reflect the scaffolded project.

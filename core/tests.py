@@ -1,14 +1,32 @@
-from unittest.mock import patch
+import logging
+import os
+import secrets
+from unittest.mock import Mock, patch
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from .models import CatalogModel, WalletTransaction
+from .models import CatalogModel, ChatExchange, WalletTransaction
+from .metering import credits_for_usage, estimate_tokens
+from .providers import (
+    MockBackend,
+    ProxyBackend,
+    get_backend,
+)
 from .wallets import InsufficientCredits, apply_wallet_transaction, provision_wallet
+
+
+class CapturingHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.messages = []
+
+    def emit(self, record):
+        self.messages.append(record.getMessage())
 
 
 class AccountViewTests(TestCase):
@@ -211,10 +229,21 @@ class WalletTests(TestCase):
                 self.assertEqual(self.wallet.transactions.count(), 1)
 
     def test_usage_debit_records_negative_amount(self):
+        exchange = ChatExchange.objects.create(
+            user=self.user,
+            model=CatalogModel.objects.get(display_name='GPT-5.6 Luna'),
+            prompt='test prompt',
+            reply='test reply',
+            input_tokens=1,
+            output_tokens=1,
+            credits_charged=35,
+            mode=ChatExchange.Mode.MOCK,
+        )
         entry = apply_wallet_transaction(
             self.wallet,
             -35,
             WalletTransaction.Type.USAGE,
+            exchange=exchange,
         )
 
         self.wallet.refresh_from_db()
@@ -227,11 +256,23 @@ class WalletTests(TestCase):
 
     def test_insufficient_usage_debit_changes_nothing(self):
         with self.assertRaises(InsufficientCredits):
-            apply_wallet_transaction(
-                self.wallet,
-                -101,
-                WalletTransaction.Type.USAGE,
-            )
+            with transaction.atomic():
+                exchange = ChatExchange.objects.create(
+                    user=self.user,
+                    model=CatalogModel.objects.get(display_name='GPT-5.6 Luna'),
+                    prompt='test prompt',
+                    reply='test reply',
+                    input_tokens=1,
+                    output_tokens=1,
+                    credits_charged=101,
+                    mode=ChatExchange.Mode.MOCK,
+                )
+                apply_wallet_transaction(
+                    self.wallet,
+                    -101,
+                    WalletTransaction.Type.USAGE,
+                    exchange=exchange,
+                )
 
         self.wallet.refresh_from_db()
         self.assertEqual(self.wallet.balance, 100)
@@ -421,3 +462,259 @@ class CatalogPickerTests(TestCase):
         self.assertEqual(response.status_code, 302)
         target.refresh_from_db()
         self.assertFalse(target.is_active)
+
+
+@override_settings(
+    LLM_PROXY_BASE_URL='',
+    OPENAI_PROXY_BASE_URL='',
+    ANTHROPIC_PROXY_BASE_URL='',
+    GOOGLE_PROXY_BASE_URL='',
+    LLM_PROXY_REQUEST_STYLE='',
+    LLM_MAX_OUTPUT_TOKENS=64,
+)
+class MeteredChatTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.get(username='demo')
+        self.wallet = self.user.wallet
+        self.model = CatalogModel.objects.get(display_name='GPT-5.6 Luna')
+        self.client.force_login(self.user)
+        self.network_guard = patch(
+            'requests.sessions.Session.send',
+            side_effect=AssertionError('Unexpected network request in offline test.'),
+        )
+        self.network_guard.start()
+        self.addCleanup(self.network_guard.stop)
+
+    def test_unconfigured_proxy_uses_mock_even_if_provider_key_exists(self):
+        sentinel = secrets.token_urlsafe(24)
+        with patch.dict(os.environ, {'OPENAI_API_KEY': sentinel}):
+            backend = get_backend(self.model)
+
+        self.assertIsInstance(backend, MockBackend)
+
+    def test_mock_reply_is_labeled_metered_and_linked_to_usage(self):
+        prompt = 'Explain token metering.'
+        response = self.client.post(
+            reverse('chat'),
+            {'model': self.model.pk, 'prompt': prompt},
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse('chat'))
+        exchange = ChatExchange.objects.get(user=self.user)
+        self.assertEqual(exchange.mode, ChatExchange.Mode.MOCK)
+        self.assertIn('MOCK MODE', exchange.reply)
+        self.assertTrue(exchange.input_tokens_estimated)
+        self.assertTrue(exchange.output_tokens_estimated)
+        self.assertEqual(exchange.input_tokens, estimate_tokens(prompt))
+        self.assertEqual(exchange.output_tokens, estimate_tokens(exchange.reply))
+        self.assertContains(response, 'MOCK REPLY - SIMULATED')
+        self.assertContains(response, f'{exchange.credits_charged} credits charged')
+
+        debit = exchange.usage_transaction
+        self.assertEqual(debit.transaction_type, WalletTransaction.Type.USAGE)
+        self.assertEqual(debit.exchange_id, exchange.pk)
+        self.assertEqual(debit.amount, -exchange.credits_charged)
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, 100 - exchange.credits_charged)
+
+    def test_preflight_blocks_without_calling_backend(self):
+        self.wallet.balance = 0
+        self.wallet.save(update_fields=('balance',))
+
+        with patch('core.chat_service.get_backend') as backend_factory:
+            response = self.client.post(
+                reverse('chat'),
+                {'model': self.model.pk, 'prompt': 'A message.'},
+            )
+
+        backend_factory.assert_not_called()
+        self.assertContains(response, 'balance is too low')
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+        self.assertEqual(self.wallet.transactions.count(), 1)
+
+    def test_inactive_model_is_rejected(self):
+        inactive = CatalogModel.objects.get(display_name='GPT-5.6 Terra')
+        inactive.is_active = False
+        inactive.save(update_fields=('is_active',))
+
+        with patch('core.chat_service.get_backend') as backend_factory:
+            response = self.client.post(
+                reverse('chat'),
+                {'model': inactive.pk, 'prompt': 'A message.'},
+            )
+
+        backend_factory.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+
+    def test_charge_rounds_combined_cost_up_once(self):
+        self.assertEqual(credits_for_usage(self.model, 1000, 1000), 3)
+        self.assertEqual(credits_for_usage(self.model, 499, 1), 1)
+        self.assertEqual(credits_for_usage(self.model, 500, 1), 1)
+        self.assertEqual(credits_for_usage(self.model, 998, 1), 1)
+        self.assertEqual(credits_for_usage(self.model, 999, 1), 2)
+
+    def test_real_usage_counts_are_stored_and_charged(self):
+        sentinel = secrets.token_urlsafe(24)
+        response_body = {
+            'choices': [{'message': {'content': 'A real-style reply.'}}],
+            'usage': {'prompt_tokens': 100, 'completion_tokens': 30},
+        }
+        response = Mock(status_code=200)
+        response.json.return_value = response_body
+
+        with override_settings(
+            OPENAI_PROXY_BASE_URL=object(),
+            LLM_PROXY_REQUEST_STYLE='openai_compatible',
+        ):
+            with patch.dict(os.environ, {'OPENAI_API_KEY': sentinel}):
+                with patch('core.providers.requests.post', return_value=response):
+                    result = self.client.post(
+                        reverse('chat'),
+                        {'model': self.model.pk, 'prompt': 'A prompt.'},
+                        follow=True,
+                    )
+
+        exchange = ChatExchange.objects.get(user=self.user)
+        self.assertEqual(exchange.mode, ChatExchange.Mode.REAL)
+        self.assertEqual(exchange.reply, 'A real-style reply.')
+        self.assertEqual((exchange.input_tokens, exchange.output_tokens), (100, 30))
+        self.assertFalse(exchange.input_tokens_estimated)
+        self.assertFalse(exchange.output_tokens_estimated)
+        expected_charge = credits_for_usage(self.model, 100, 30)
+        self.assertEqual(exchange.credits_charged, expected_charge)
+        self.assertEqual(exchange.usage_transaction.amount, -expected_charge)
+        self.assertContains(result, 'REAL REPLY')
+
+    def test_provider_native_response_usage_is_normalized(self):
+        cases = (
+            (
+                'anthropic',
+                {'content': [{'type': 'text', 'text': 'Native reply.'}], 'usage': {'input_tokens': 12, 'output_tokens': 8}},
+                'Claude Haiku 4.5',
+            ),
+            (
+                'google',
+                {'candidates': [{'content': {'parts': [{'text': 'Native reply.'}]}}], 'usageMetadata': {'promptTokenCount': 12, 'candidatesTokenCount': 8}},
+                'Gemini 3.1 Flash-Lite',
+            ),
+        )
+        for provider, body, display_name in cases:
+            with self.subTest(provider=provider):
+                model = CatalogModel.objects.get(display_name=display_name)
+                response = Mock(status_code=200)
+                response.json.return_value = body
+                backend = ProxyBackend(
+                    object(),
+                    provider,
+                    model.model_id,
+                    'provider_native',
+                    secrets.token_urlsafe(24),
+                )
+                with patch('core.providers.requests.post', return_value=response) as outbound:
+                    result = backend.complete(model, 'A prompt.', 64)
+                self.assertEqual(result.reply, 'Native reply.')
+                self.assertEqual((result.input_tokens, result.output_tokens), (12, 8))
+                self.assertEqual(outbound.call_args.kwargs['json']['model'], model.model_id)
+
+    def test_configured_proxy_without_key_errors_without_mock_fallback(self):
+        with override_settings(
+            OPENAI_PROXY_BASE_URL=object(),
+            LLM_PROXY_REQUEST_STYLE='openai_compatible',
+        ):
+            with patch.dict(os.environ, {'OPENAI_API_KEY': ''}):
+                with patch('core.providers.requests.post') as outbound:
+                    response = self.client.post(
+                        reverse('chat'),
+                        {'model': self.model.pk, 'prompt': 'A message.'},
+                    )
+
+        outbound.assert_not_called()
+        self.assertContains(response, 'credential is required')
+        self.assertNotContains(response, 'MOCK MODE')
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+
+    def test_configured_proxy_without_style_errors_without_mock_fallback(self):
+        with override_settings(
+            OPENAI_PROXY_BASE_URL=object(),
+            LLM_PROXY_REQUEST_STYLE='',
+        ):
+            with patch.dict(os.environ, {'OPENAI_API_KEY': secrets.token_urlsafe(24)}):
+                with patch('core.providers.requests.post') as outbound:
+                    response = self.client.post(
+                        reverse('chat'),
+                        {'model': self.model.pk, 'prompt': 'A message.'},
+                    )
+
+        outbound.assert_not_called()
+        self.assertContains(response, 'request style is missing or unsupported')
+        self.assertNotContains(response, 'MOCK MODE')
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+
+    def test_failed_proxy_call_does_not_fall_back_or_charge(self):
+        with override_settings(
+            OPENAI_PROXY_BASE_URL=object(),
+            LLM_PROXY_REQUEST_STYLE='openai_compatible',
+        ):
+            with patch.dict(os.environ, {'OPENAI_API_KEY': secrets.token_urlsafe(24)}):
+                with patch(
+                    'core.providers.requests.post',
+                    side_effect=RuntimeError('opaque transport failure'),
+                ) as outbound:
+                    response = self.client.post(
+                        reverse('chat'),
+                        {'model': self.model.pk, 'prompt': 'A message.'},
+                    )
+
+        self.assertTrue(outbound.called)
+        self.assertContains(response, 'configured model proxy could not be reached')
+        self.assertNotContains(response, 'MOCK MODE')
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+        self.assertEqual(self.wallet.transactions.count(), 1)
+
+    def test_proxy_key_sentinel_is_absent_from_logs_and_user_error(self):
+        sentinel = secrets.token_urlsafe(32)
+        root_logger = logging.getLogger()
+        handler = CapturingHandler()
+        root_logger.addHandler(handler)
+        try:
+            with override_settings(
+                OPENAI_PROXY_BASE_URL=object(),
+                LLM_PROXY_REQUEST_STYLE='openai_compatible',
+            ):
+                with patch.dict(os.environ, {'OPENAI_API_KEY': sentinel}):
+                    with patch(
+                        'core.providers.requests.post',
+                        side_effect=RuntimeError(f'transport error {sentinel}'),
+                    ):
+                        response = self.client.post(
+                            reverse('chat'),
+                            {'model': self.model.pk, 'prompt': 'A message.'},
+                        )
+        finally:
+            root_logger.removeHandler(handler)
+
+        response_text = response.content.decode()
+        logged_text = '\n'.join(handler.messages)
+        self.assertFalse(
+            sentinel in response_text or sentinel in logged_text,
+            'Sensitive data escaped into output.',
+        )
+
+    def test_final_debit_failure_discards_reply_and_exchange(self):
+        transactions_before = self.wallet.transactions.count()
+        with patch(
+            'core.chat_service.apply_wallet_transaction',
+            side_effect=InsufficientCredits('balance changed'),
+        ):
+            response = self.client.post(
+                reverse('chat'),
+                {'model': self.model.pk, 'prompt': 'A message.'},
+            )
+
+        self.assertContains(response, 'reply was discarded')
+        self.assertFalse(ChatExchange.objects.filter(user=self.user).exists())
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.balance, 100)
+        self.assertEqual(self.wallet.transactions.count(), transactions_before)

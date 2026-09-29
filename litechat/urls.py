@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from core.views import CatalogPickerView
+from core.views import CatalogPickerView, ChatView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,4 +26,5 @@ urlpatterns = [
     path('accounts/', include('core.urls')),
     path('wallet/', include('core.wallet_urls')),
     path('models/', CatalogPickerView.as_view(), name='model_picker'),
+    path('chat/', ChatView.as_view(), name='chat'),
 ]

@@ -1,0 +1,53 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Chat | LiteChat{% endblock %}
+
+{% block content %}
+  <section class="chat-compose account-card">
+    <p class="eyebrow">Metered chat</p>
+    <h1>New message</h1>
+    <p class="intro">Choose an active model and send a prompt. MOCK replies are simulated, clearly labeled, and metered from estimated tokens.</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {{ form.as_p }}
+      <button class="primary-button" type="submit">Send message</button>
+    </form>
+  </section>
+
+  <section class="chat-history" aria-labelledby="chat-history-heading">
+    <h2 id="chat-history-heading">Recent exchanges</h2>
+    {% for exchange in exchanges %}
+      <article class="chat-exchange">
+        <header class="exchange-heading">
+          <div>
+            <h3>{{ exchange.model.display_name }}</h3>
+            <time datetime="{{ exchange.created_at|date:'c' }}">{{ exchange.created_at|date:"Y-m-d H:i" }}</time>
+          </div>
+          {% if exchange.mode == 'mock' %}
+            <span class="mode-badge mode-mock">MOCK REPLY - SIMULATED</span>
+          {% else %}
+            <span class="mode-badge mode-real">REAL REPLY</span>
+          {% endif %}
+        </header>
+        <div class="exchange-prompt">
+          <p class="exchange-label">You</p>
+          <p>{{ exchange.prompt|linebreaksbr }}</p>
+        </div>
+        <div class="exchange-reply">
+          <p class="exchange-label">Reply</p>
+          <p>{{ exchange.reply|linebreaksbr }}</p>
+        </div>
+        <footer class="exchange-cost">
+          <strong>{{ exchange.credits_charged }} credits charged</strong>
+          <span>
+            {{ exchange.input_tokens }} input / {{ exchange.output_tokens }} output tokens
+            {% if exchange.input_tokens_estimated or exchange.output_tokens_estimated %}(estimated){% endif %}
+          </span>
+        </footer>
+      </article>
+    {% empty %}
+      <p class="empty-catalog">No messages yet. Your first exchange will appear here.</p>
+    {% endfor %}
+  </section>
+{% endblock %}

@@ -302,6 +302,156 @@ input:focus {
   color: #68746f;
 }
 
+.chat-compose {
+  margin-bottom: 2rem;
+}
+
+.chat-history h2 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+}
+
+.chat-exchange {
+  margin: 1rem 0;
+  padding: clamp(1rem, 4vw, 1.5rem);
+  border: 1px solid #e2e4dc;
+  border-radius: 0.9rem;
+  background: #fff;
+}
+
+.exchange-heading,
+.exchange-cost {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.exchange-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.exchange-heading time,
+.exchange-cost span {
+  color: #68746f;
+  font-size: 0.78rem;
+}
+
+.mode-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mode-mock {
+  background: #fff0ce;
+  color: #755011;
+}
+
+.mode-real {
+  background: #e7f2eb;
+  color: #176b56;
+}
+
+.exchange-prompt,
+.exchange-reply {
+  margin: 1.25rem 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.exchange-label {
+  margin: 0 0 0.35rem;
+  color: #68746f;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.exchange-cost {
+  padding-top: 0.8rem;
+  border-top: 1px solid #edf0e9;
+}
+
+.chat-compose {
+  margin-bottom: 2rem;
+}
+
+.chat-history h2 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+}
+
+.chat-exchange {
+  margin: 1rem 0;
+  padding: clamp(1rem, 4vw, 1.5rem);
+  border: 1px solid #e2e4dc;
+  border-radius: 0.9rem;
+  background: #fff;
+}
+
+.exchange-heading,
+.exchange-cost {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.exchange-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.exchange-heading time,
+.exchange-cost span {
+  color: #68746f;
+  font-size: 0.78rem;
+}
+
+.mode-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mode-mock {
+  background: #fff0ce;
+  color: #755011;
+}
+
+.mode-real {
+  background: #e7f2eb;
+  color: #176b56;
+}
+
+.exchange-prompt,
+.exchange-reply {
+  margin: 1.25rem 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.exchange-label {
+  margin: 0 0 0.35rem;
+  color: #68746f;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.exchange-cost {
+  padding-top: 0.8rem;
+  border-top: 1px solid #edf0e9;
+}
+
 .fake-payment-note {
   padding: 0.7rem 0.8rem;
   border-left: 3px solid #d4a756;
@@ -362,6 +512,16 @@ input:focus {
     gap: 0.5rem;
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+
+  .exchange-cost {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .exchange-cost {
+    flex-direction: column;
+    gap: 0.3rem;
   }
 
   .signed-in {

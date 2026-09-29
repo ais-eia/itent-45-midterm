@@ -42,6 +42,12 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(',')
     if origin.strip()
 ]
+LLM_PROXY_BASE_URL = os.getenv('LLM_PROXY_BASE_URL', '').strip()
+OPENAI_PROXY_BASE_URL = os.getenv('OPENAI_PROXY_BASE_URL', '').strip()
+ANTHROPIC_PROXY_BASE_URL = os.getenv('ANTHROPIC_PROXY_BASE_URL', '').strip()
+GOOGLE_PROXY_BASE_URL = os.getenv('GOOGLE_PROXY_BASE_URL', '').strip()
+LLM_PROXY_REQUEST_STYLE = os.getenv('LLM_PROXY_REQUEST_STYLE', '').strip().lower()
+LLM_MAX_OUTPUT_TOKENS = int(os.getenv('LLM_MAX_OUTPUT_TOKENS', '512'))
 
 
 # Application definition

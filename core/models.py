@@ -30,6 +30,13 @@ class WalletTransaction(models.Model):
     )
     amount = models.BigIntegerField()
     transaction_type = models.CharField(max_length=20, choices=Type.choices)
+    exchange = models.OneToOneField(
+        'ChatExchange',
+        on_delete=models.PROTECT,
+        related_name='usage_transaction',
+        null=True,
+        blank=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -37,8 +44,16 @@ class WalletTransaction(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    Q(transaction_type__in=('signup_bonus', 'top_up'), amount__gt=0)
-                    | Q(transaction_type='usage', amount__lt=0)
+                    Q(
+                        transaction_type__in=('signup_bonus', 'top_up'),
+                        amount__gt=0,
+                        exchange__isnull=True,
+                    )
+                    | Q(
+                        transaction_type='usage',
+                        amount__lt=0,
+                        exchange__isnull=False,
+                    )
                 ),
                 name='wallet_transaction_amount_matches_type',
             ),
@@ -93,3 +108,35 @@ class CatalogModel(models.Model):
 
     def __str__(self):
         return f'{self.display_name} ({self.get_provider_display()})'
+
+
+class ChatExchange(models.Model):
+    class Mode(models.TextChoices):
+        MOCK = 'mock', 'Mock'
+        REAL = 'real', 'Real'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='chat_exchanges',
+    )
+    model = models.ForeignKey(
+        CatalogModel,
+        on_delete=models.PROTECT,
+        related_name='exchanges',
+    )
+    prompt = models.TextField()
+    reply = models.TextField()
+    input_tokens = models.PositiveIntegerField()
+    output_tokens = models.PositiveIntegerField()
+    input_tokens_estimated = models.BooleanField(default=False)
+    output_tokens_estimated = models.BooleanField(default=False)
+    credits_charged = models.PositiveBigIntegerField()
+    mode = models.CharField(max_length=8, choices=Mode.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at', '-pk')
+
+    def __str__(self):
+        return f'{self.user} - {self.model.display_name} ({self.credits_charged} credits)'

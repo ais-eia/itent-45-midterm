@@ -12,17 +12,19 @@ class InsufficientCredits(Exception):
 
 
 @transaction.atomic
-def apply_wallet_transaction(wallet, amount, transaction_type):
+def apply_wallet_transaction(wallet, amount, transaction_type, exchange=None):
     if not isinstance(amount, int) or isinstance(amount, bool):
         raise ValueError('Wallet amounts must be whole credits.')
     if transaction_type in (WalletTransaction.Type.SIGNUP_BONUS, WalletTransaction.Type.TOP_UP):
         if amount <= 0:
             raise ValueError('Credit grants must be positive.')
     elif transaction_type == WalletTransaction.Type.USAGE:
-        if amount >= 0:
-            raise ValueError('Usage transactions must be negative.')
+        if amount >= 0 or exchange is None:
+            raise ValueError('Usage transactions must be negative and link an exchange.')
     else:
         raise ValueError('Unknown wallet transaction type.')
+    if transaction_type != WalletTransaction.Type.USAGE and exchange is not None:
+        raise ValueError('Only usage transactions can link an exchange.')
 
     wallets = Wallet.objects.filter(pk=wallet.pk)
     if amount < 0:
@@ -40,6 +42,7 @@ def apply_wallet_transaction(wallet, amount, transaction_type):
         wallet_id=wallet.pk,
         amount=amount,
         transaction_type=transaction_type,
+        exchange=exchange,
     )
     wallet.refresh_from_db(fields=('balance', 'updated_at'))
     return entry

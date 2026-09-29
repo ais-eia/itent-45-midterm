@@ -15,7 +15,7 @@
 - [x] Update README and `doc/wiki/` to explain the conservative estimate, output-token allowance, balance warning, and the distinction between the pre-send estimate and final metered charge.
 - [x] Run Django checks, migration checks, and the full test suite with network access blocked in MOCK mode.
 - [x] Clone into `/tmp`, follow only the README setup, confirm migrations/server startup and demo login, and verify the estimate updates for prompt/model changes without changing the wallet or creating an exchange; then remove the temporary clone.
-- [ ] Review and commit with Conventional Commits, merge to `main`, verify after merge, and push to `origin main`.
+- [x] Review and commit with Conventional Commits, merge to `main`, verify after merge, and push to `origin main`.
 
 ## Decisions Captured
 

@@ -12,8 +12,9 @@
 - [x] Add tests for the nine seeded rows and provisional prices/IDs, seed availability after migrations, provider/tier/price constraints, per-provider ID uniqueness, active filtering, admin list editing, picker grouping/content, and no provider calls or wallet changes.
 - [x] Update `doc/wiki/model-catalog.md` with the exact catalog and prices, prominently marked **PROVISIONAL**, and update README/wiki to explain the picker, admin activation, and unverified model IDs.
 - [x] Run Django checks/tests and verify catalog migrations from an empty database.
-- [ ] Clone into `/tmp`, follow only the README setup, confirm migrations, catalog contents, server startup, and demo login; then remove the temporary clone.
-- [ ] Review and commit with Conventional Commits, merge to `main`, confirm the app works after merge, and push to `origin main`.
+- [x] Clone into `/tmp`, follow only the README setup, confirm migrations, catalog contents, server startup, and demo login; then remove the temporary clone.
+- [x] Review and commit with Conventional Commits.
+- [ ] Merge to `main`, confirm the app works after merge, and push to `origin main`.
 
 ## Provisional Data To Seed
 

@@ -18,7 +18,7 @@
 - [x] Run Django checks/tests and verify a fresh migration works in MOCK mode with network access blocked.
 - [x] Clone into `/tmp`, follow only README setup, confirm migrations/server startup, demo login, and a charged mock exchange with a linked usage ledger; remove the temporary clone.
 - [x] Review and commit with Conventional Commits.
-- [ ] Merge to `main`, verify the app after merge, and push to `origin main`.
+- [x] Merge to `main`, verify the app after merge, and push to `origin main`.
 
 ## Approved Runtime Decisions
 

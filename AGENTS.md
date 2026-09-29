@@ -15,7 +15,7 @@ Follow this workflow for every feature or change:
 - Keep the repository self-sufficient. After every change, keep `requirements.txt`, `.env.example`, and `README.md` (including exact setup and run steps) up to date. A fresh clone must run after: create a virtual environment, `pip install -r requirements.txt`, `cp .env.example .env`, `python manage.py migrate`, and `python manage.py runserver`.
 - Always commit database migrations. Never add migrations to `.gitignore`. Since `db.sqlite3` is not committed, create seed data (including the model catalog and demo user) with a data migration or management command.
 - Do not use hardcoded absolute paths or put secrets in code.
-- Before merging any branch, clone the repository into `/tmp`, follow only the README steps, confirm the server starts and the demo login works, then delete the temporary clone.
+- Before merging any branch, clone the repository into `/tmp`, follow only the README steps, confirm migrations run and the server starts, then delete the temporary clone. Once the user accounts feature exists, also confirm the demo login works.
 - Name study and plan files with a numeric prefix and slug, for example `doc/study/001-user-accounts.md` and `doc/plan/001-user-accounts.md`.
 
 ## Project Scope

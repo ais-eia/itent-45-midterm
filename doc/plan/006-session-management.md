@@ -17,7 +17,7 @@
 - [x] Update README, `doc/wiki/`, and the credit-wallet wiki so session behavior, title rules, pagination, model changes, delete confirmation, soft-delete retention, and deleted-chat history labeling are documented.
 - [x] Run Django checks/tests and verify existing and fresh databases migrate correctly in MOCK mode.
 - [x] Clone into `/tmp`, follow only README setup, verify demo login, two chats, model-switch continuation, rename, confirmed soft delete, balance and ledger retention, and stored exchanges; verify pagination and hosted-prefix URLs in tests, then remove the temporary clone.
-- [ ] Review and commit with Conventional Commits, merge to `main`, verify after merge, and push to `origin main`.
+- [x] Review and commit with Conventional Commits, merge to `main`, verify after merge, and push to `origin main`.
 
 ## Decisions Captured
 

@@ -41,7 +41,7 @@ Browse active provisional models at <http://localhost:8000/models/>. The picker 
 
 ## Metered Chat
 
-After logging in, open <http://localhost:8000/chat/> to choose an active model and send a prompt. If no applicable proxy endpoint is configured, the app uses an offline MOCK backend: replies are clearly labeled, token counts are estimated, and the exchange is charged using the catalog's provisional rates.
+After logging in, open <http://localhost:8000/chat/> to choose an active model and send a prompt. Each successful exchange and its credit cost appear below the chat form.
 
 When no applicable proxy endpoint is configured, the app uses MOCK. If an endpoint is configured, the app requires the selected provider's environment credential and `LLM_PROXY_REQUEST_STYLE` (`openai_compatible` or `provider_native`); missing configuration or a failed request returns an error and never falls back to MOCK. Configure `LLM_PROXY_BASE_URL` or a provider-specific `OPENAI_PROXY_BASE_URL`, `ANTHROPIC_PROXY_BASE_URL`, or `GOOGLE_PROXY_BASE_URL` override, the corresponding `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_API_KEY`, and `LLM_MAX_OUTPUT_TOKENS` in your local `.env`. The proxy request contract is not confirmed. Never commit, print, or log credential values or proxy endpoint values.
 

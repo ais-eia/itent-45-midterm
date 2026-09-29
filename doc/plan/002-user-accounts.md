@@ -14,6 +14,6 @@
 - [x] Run Django checks and tests, then verify migrations and demo login from a fresh Django test database.
 - [x] Clone into `/tmp`, follow only the README setup, confirm migrations and server startup, and verify `demo` / `demo12345` login; remove the temporary clone.
 - [x] Review and commit changes using Conventional Commits.
-- [ ] Merge the branch to `main`, confirm the app runs after merge, and push to `origin main`.
+- [x] Merge the branch to `main`, confirm the app runs after merge, and push to `origin main`.
 
 Out of scope: custom user model, email verification, password reset, profile fields, roles, billing, chat, provider calls, and model catalog changes.
